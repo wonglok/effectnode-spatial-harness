@@ -13,6 +13,7 @@ export interface AuthUser {
   username: string;
   email: string;
   emailVerified: boolean;
+  googleLinked: boolean;
   role: UserRole;
   avatarUrl: string | null;
   lastUsedMethod: LoginMethod | null;

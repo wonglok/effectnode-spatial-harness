@@ -9,6 +9,7 @@ import {
 import type { H3Event } from "nitro/h3";
 import { randomBytes } from "node:crypto";
 import { ensureDb } from "../../../utils/mongoose";
+import { getSessionUser } from "../../../utils/auth";
 import { User } from "../../../models/User";
 import { setSessionCookie } from "../../../utils/session";
 import {
@@ -18,15 +19,24 @@ import {
 
 const STATE_COOKIE = "google.oauth";
 
-function readState(event: H3Event): { nonce: string; next: string } | null {
+function readState(event: H3Event): {
+  nonce: string;
+  next: string;
+  intent: "login" | "connect";
+} | null {
   const raw = getCookie(event, STATE_COOKIE);
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { nonce?: unknown; next?: unknown };
+    const parsed = JSON.parse(raw) as {
+      nonce?: unknown;
+      next?: unknown;
+      intent?: unknown;
+    };
     if (typeof parsed.nonce !== "string" || typeof parsed.next !== "string") {
       return null;
     }
-    return { nonce: parsed.nonce, next: parsed.next };
+    const intent = parsed.intent === "connect" ? "connect" : "login";
+    return { nonce: parsed.nonce, next: parsed.next, intent };
   } catch {
     return null;
   }
@@ -77,6 +87,24 @@ export default defineEventHandler(async (event) => {
   const googleId = profile.sub;
 
   await ensureDb();
+
+  // Connect flow: link Google to the currently signed-in account.
+  if (saved.intent === "connect") {
+    const sessionUser = await getSessionUser(event);
+    if (!sessionUser) {
+      return sendRedirect(event, "/login?error=google-session", 302);
+    }
+    const conflict = await User.findOne({ googleId });
+    if (conflict && conflict._id.toString() !== sessionUser._id.toString()) {
+      return sendRedirect(event, "/account?error=google-conflict", 302);
+    }
+    sessionUser.googleId = googleId;
+    if (!sessionUser.avatarUrl) {
+      sessionUser.avatarUrl = profile.picture ?? null;
+    }
+    await sessionUser.save();
+    return sendRedirect(event, saved.next, 302);
+  }
 
   // Find-or-create: by googleId first, then by verified email (link), else new.
   let user = await User.findOne({ googleId });

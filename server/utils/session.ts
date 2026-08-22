@@ -34,6 +34,7 @@ export function toPublicUser(doc: UserDocument): AuthUser {
     username: doc.username,
     email: doc.email,
     emailVerified: doc.emailVerified,
+    googleLinked: !!doc.googleId,
     role: doc.role,
     avatarUrl: doc.avatarUrl ?? null,
     lastUsedMethod: doc.lastUsedMethod ?? null,

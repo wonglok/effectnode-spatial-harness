@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HeroBackdrop } from "@/components/hero-backdrop";
+import { GoogleLogo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { Check, Fingerprint, LogOut, Mail, Upload } from "lucide-react";
 
@@ -41,6 +42,27 @@ export function AccountPage() {
           ? "Email is already verified."
           : "Verification email sent — check your inbox.",
       );
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function onConnectGoogle() {
+    window.location.href = `/api/auth/google/start?intent=connect&next=${encodeURIComponent(
+      "/account",
+    )}`;
+  }
+
+  async function onDisconnectGoogle() {
+    setBusy("google");
+    setError(null);
+    setNotice(null);
+    try {
+      await api("/api/auth/google/disconnect", { method: "POST", body: {} });
+      await refresh();
+      setNotice("Google account disconnected.");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -199,6 +221,42 @@ export function AccountPage() {
             >
               {busy === "passkey" ? "Waiting for device…" : "Register a passkey"}
             </Button>
+          </div>
+
+          {/* Google account */}
+          <div className="mt-4 rounded-2xl border border-primary/15 bg-white/60 p-5">
+            <div className="flex items-center gap-2">
+              <GoogleLogo className="size-4" />
+              <span className="text-sm font-medium text-foreground">
+                Google account
+              </span>
+              {user.googleLinked && (
+                <Badge variant="default" className="ml-auto">
+                  <Check className="size-3" /> Connected
+                </Badge>
+              )}
+            </div>
+            {user.googleLinked ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                disabled={busy !== null}
+                onClick={onDisconnectGoogle}
+              >
+                {busy === "google" ? "Disconnecting…" : "Disconnect Google"}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                disabled={busy !== null}
+                onClick={onConnectGoogle}
+              >
+                Connect Google account
+              </Button>
+            )}
           </div>
 
           {notice && <p className="mt-4 text-sm text-[#078b87]">{notice}</p>}
