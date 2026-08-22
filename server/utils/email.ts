@@ -33,7 +33,7 @@ export async function sendVerificationEmail(
   const url = `${origin}/verify-email?token=${token}`;
 
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM ?? "Multiverse <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM ?? "3D & AI Harness <onboarding@resend.dev>";
 
   if (!apiKey) {
     // Dev fallback: no email provider configured — log the link instead.

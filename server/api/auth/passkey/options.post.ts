@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const existing = await Passkey.find({ user: user._id });
 
   const options = await generateRegistrationOptions({
-    rpName: "Multiverse",
+    rpName: "3D & AI Harness",
     rpID: getRpID(event),
     userName: user.username,
     userDisplayName: user.username,

@@ -56,9 +56,6 @@
         "typescript": "^6.0.3",
         "vite": "^8.0.16",
       },
-      "optionalDependencies": {
-        "ioredis": "^5.11.1",
-      },
     },
   },
   "packages": {

@@ -221,7 +221,6 @@ export default defineWebSocketHandler({
 
         send(peer, renameMsg);
         peer.publish(placeId, JSON.stringify(renameMsg));
-        publishEvent(placeId, renameMsg);
         break;
       }
 
@@ -242,7 +241,6 @@ export default defineWebSocketHandler({
         };
 
         peer.publish(placeId, JSON.stringify(avatarMsg));
-        publishEvent(placeId, avatarMsg);
         break;
       }
 

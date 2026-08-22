@@ -9,7 +9,7 @@ import type { H3Event } from "nitro/h3";
 import type { AuthUser, UserRole } from "../../shared/types/auth";
 import type { UserDocument } from "../models/User";
 
-const COOKIE_NAME = "multiverse.session";
+const COOKIE_NAME = "harness.session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 export interface SessionClaims {

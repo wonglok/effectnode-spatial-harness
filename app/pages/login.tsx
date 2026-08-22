@@ -130,7 +130,7 @@ export function LoginPage() {
         <div className="rounded-3xl border border-primary/15 bg-white/75 p-7 shadow-xl shadow-primary/10 backdrop-blur-xl sm:p-9">
           <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Welcome back to Multiverse.
+            Welcome back to 3D & AI Harness.
           </p>
 
           {step === 1 && (

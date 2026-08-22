@@ -10,7 +10,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "../../shared/types/auth";
 
-const LAST_METHOD_KEY = "multiverse.lastMethod";
+const LAST_METHOD_KEY = "harness.lastMethod";
 
 function loadLastMethods(): Record<string, LoginMethod> {
   try {

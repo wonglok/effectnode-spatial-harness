@@ -75,7 +75,7 @@ export function LandingPage() {
                 "linear-gradient(100deg, #0abab5 0%, #3bb6d8 55%, #9b8af0 100%)",
             }}
           >
-            Multiverse
+            3D & AI Harness
           </h1>
           <p className="max-w-lg text-balance text-lg leading-relaxed text-muted-foreground">
             Enter a multiplayer 3D world. Explore places, chat with others, and

@@ -26,7 +26,6 @@ The 3D world is rendered with Three.js. The real-time stuff happens over WebSock
 - **Frontend** — React + Three.js (React Three Fiber) for the 3D world
 - **Real-time** — WebSockets via Nitro + crossws, with `reconnecting-websocket` for automatic reconnect and message buffering
 - **Server** — Nitro v3 running on Vercel Functions
-- **Multi-server (optional)** — Redis pub/sub for scaling across servers. Works fine without it on a single server
 - **Styling** — Tailwind CSS + shadcn/ui
 - **Post-processing** — Bloom via Three.js TSL render pipeline
 
@@ -52,8 +51,7 @@ shared/
 server/
 ├── api/ws.ts             # WebSocket handler — join, move, chat, voice
 └── utils/
-    ├── identity.ts       # Random name + color for each connection
-    └── redis.ts          # Redis pub/sub for multi-server scaling
+    └── identity.ts       # Random name + color for each connection
 ```
 
 ### Running locally
@@ -64,12 +62,6 @@ pnpm dev
 ```
 
 Open `http://localhost:3000` in two browser tabs to see live multiplayer in action.
-
-### Environment variables
-
-| Variable              | Required | Purpose                                                                                                                                                                                                                      |
-| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `METAVERSE_REDIS_URL` | No       | Redis connection for scaling across multiple servers. Skip this — the project works perfectly on a single server without Redis. Only set it if you're running multiple server instances and need them to share player state. |
 
 ### Adding features
 
