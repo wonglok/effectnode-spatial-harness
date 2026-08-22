@@ -1,0 +1,259 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Light, airy "spatial" theme. Tiffany-blue primary (#0ABAB5) against a pale
+ * mint wash, with a deep teal ink for text and soft aurora gradients behind
+ * the interface. Rebrand by tweaking --primary and the aurora blob hues.
+ */
+:root {
+  --radius: 0.875rem;
+
+  --background: #f1f8f8;
+  --foreground: #0b2f2d;
+  --card: #ffffff;
+  --card-foreground: #0b2f2d;
+  --popover: #ffffff;
+  --popover-foreground: #0b2f2d;
+
+  --primary: #0abab5;
+  --primary-foreground: #04201e;
+
+  --secondary: #e3f4f3;
+  --secondary-foreground: #0b2f2d;
+  --muted: #eaf2f2;
+  --muted-foreground: #5c7b78;
+  --accent: #ddf1f0;
+  --accent-foreground: #0b2f2d;
+  --destructive: #e5484d;
+
+  --border: rgba(10, 186, 181, 0.18);
+  --input: rgba(10, 186, 181, 0.24);
+  --ring: #0abab5;
+}
+
+/* A coherent dark-tiffany variant, kept for any future dark surfaces. */
+.dark {
+  --background: #0a1f1e;
+  --foreground: #eaf6f5;
+  --card: #102b29;
+  --card-foreground: #eaf6f5;
+  --popover: #102b29;
+  --popover-foreground: #eaf6f5;
+
+  --primary: #0abab5;
+  --primary-foreground: #04201e;
+
+  --secondary: #143532;
+  --secondary-foreground: #eaf6f5;
+  --muted: #143532;
+  --muted-foreground: #8fb3b0;
+  --accent: #16403d;
+  --accent-foreground: #eaf6f5;
+  --destructive: #e5484d;
+
+  --border: rgba(10, 186, 181, 0.22);
+  --input: rgba(10, 186, 181, 0.26);
+  --ring: #0abab5;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-display: "Space Grotesk Variable", ui-sans-serif, system-ui,
+    sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ── Aurora background ──────────────────────────────────────────────────────
+ * The signature: several soft, slow-drifting radial gradients (tiffany, aqua,
+ * lavender, peach) floating over a pale mint base. Evokes light through a
+ * portal — a quiet, layered "multiverse" atmosphere.
+ */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #f7fcfc 0%, #f0f8f7 50%, #ecf5f5 100%);
+}
+
+.aurora__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.aurora__blob--tiffany {
+  width: 44vw;
+  height: 44vw;
+  left: -10vw;
+  top: -14vh;
+  background: radial-gradient(circle at center, #7fe6df 0%, transparent 68%);
+  animation: aurora-drift-a 24s ease-in-out infinite alternate;
+}
+
+.aurora__blob--aqua {
+  width: 38vw;
+  height: 38vw;
+  right: -8vw;
+  top: -8vh;
+  background: radial-gradient(circle at center, #8fd9f0 0%, transparent 68%);
+  animation: aurora-drift-b 30s ease-in-out infinite alternate;
+}
+
+.aurora__blob--lavender {
+  width: 36vw;
+  height: 36vw;
+  left: 22vw;
+  bottom: -18vh;
+  background: radial-gradient(circle at center, #cdbff7 0%, transparent 68%);
+  animation: aurora-drift-c 26s ease-in-out infinite alternate;
+}
+
+.aurora__blob--peach {
+  width: 32vw;
+  height: 32vw;
+  right: 18vw;
+  bottom: -12vh;
+  background: radial-gradient(circle at center, #ffe1cc 0%, transparent 68%);
+  animation: aurora-drift-d 32s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(8vw, 6vh, 0) scale(1.15);
+  }
+}
+
+@keyframes aurora-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.1);
+  }
+  to {
+    transform: translate3d(-7vw, 8vh, 0) scale(0.95);
+  }
+}
+
+@keyframes aurora-drift-c {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-6vw, -5vh, 0) scale(1.12);
+  }
+}
+
+@keyframes aurora-drift-d {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(5vw, -7vh, 0) scale(0.95);
+  }
+}
+
+/* Dotted grid backdrop for the live canvas. */
+.dot-grid {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--border) 90%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+/* Emoji reaction burst. */
+.reaction {
+  animation: float-up 1.8s ease-out forwards;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -8px) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90px) scale(1);
+  }
+}
+
+/* Smooth cursor interpolation between position frames. */
+.cursor {
+  transition:
+    left 90ms linear,
+    top 90ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora__blob {
+    animation: none;
+  }
+}
+
+body {
+  overflow-x: hidden;
+}
+
+input {
+  font-size: 17px !important;
+}
+
+html,
+document,
+body,
+#root {
+  height: 100%;
+}

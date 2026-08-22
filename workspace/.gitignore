@@ -1,0 +1,4 @@
+# Ignore everything (generated local data) except this file and the README.
+*
+!.gitignore
+!README.md
