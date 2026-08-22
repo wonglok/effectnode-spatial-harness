@@ -87,6 +87,22 @@ export function UserManagementPage() {
     }
   }
 
+  async function setVerified(id: string, verified: boolean) {
+    setError(null);
+    setNotice(null);
+    try {
+      await api(`/api/admin/users/${id}/verified`, {
+        method: "PATCH",
+        body: { verified },
+      });
+      setNotice("Verification updated.");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      await load(); // resync the checkbox with the server truth
+    }
+  }
+
   async function removeUser(id: string) {
     if (!window.confirm("Delete this user? This cannot be undone.")) return;
     setError(null);
@@ -229,9 +245,25 @@ export function UserManagementPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={u.emailVerified ? "outline" : "subtle"}>
-                          {u.emailVerified ? "Verified" : "Pending"}
-                        </Badge>
+                        <label className="inline-flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={u.emailVerified}
+                            onChange={(e) => setVerified(u.id, e.target.checked)}
+                            className="size-4 accent-[#0abab5]"
+                            aria-label={`Mark ${u.username} as verified`}
+                          />
+                          <span
+                            className={cn(
+                              "text-sm",
+                              u.emailVerified
+                                ? "text-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {u.emailVerified ? "Verified" : "Pending"}
+                          </span>
+                        </label>
                       </td>
                       <td className="px-4 py-3">
                         <button
