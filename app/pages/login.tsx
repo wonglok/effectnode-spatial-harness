@@ -62,6 +62,29 @@ function MethodCard({
   );
 }
 
+function GoogleLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45c-.28 1.5-1.13 2.77-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3c-1.08.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.72-4.95H1.28v3.09C3.26 21.3 7.31 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.29c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.28C.47 8.24 0 10.05 0 12s.47 3.76 1.28 5.38l4-3.09z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.77c1.76 0 3.34.6 4.59 1.79l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.28 6.62l4 3.09C6.22 6.88 8.87 4.77 12 4.77z"
+      />
+    </svg>
+  );
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,6 +101,12 @@ export function LoginPage() {
 
   const nextPath =
     (location.state as { next?: string } | null)?.next ?? "/account";
+
+  function handleGoogle() {
+    window.location.href = `/api/auth/google/start?next=${encodeURIComponent(
+      nextPath,
+    )}`;
+  }
 
   async function handleResolve(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -228,6 +257,20 @@ export function LoginPage() {
           )}
 
           {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+          <div className="mt-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-foreground/10" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-foreground/10" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogle}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-white/90"
+          >
+            <GoogleLogo /> Continue with Google
+          </button>
         </div>
       </main>
     </div>

@@ -11,6 +11,8 @@ export interface UserDoc {
   email: string;
   emailVerified: boolean;
   passwordHash: string | null;
+  /** Google subject id, when the account is linked to a Google login. */
+  googleId: string | null;
   avatarUrl: string | null;
   role: UserRole;
   lastUsedMethod: LoginMethod | null;
@@ -39,6 +41,7 @@ const userSchema = new Schema<UserDoc>(
     },
     emailVerified: { type: Boolean, default: false },
     passwordHash: { type: String, default: null },
+    googleId: { type: String, default: null, unique: true, sparse: true },
     avatarUrl: { type: String, default: null },
     role: { type: String, enum: USER_ROLES, default: "public", index: true },
     lastUsedMethod: {

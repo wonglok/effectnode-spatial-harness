@@ -1,217 +1,144 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { HeroBackdrop } from "@/components/hero-backdrop";
-import { cn } from "@/lib/utils";
 import type { World } from "../../shared/types/world";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import { WorldViewport } from "@/components/world-edit/world-viewport";
+import { WorldSettingsDialog } from "@/components/world-edit/world-settings-dialog";
+import {
+  ArrowLeft,
+  Box,
+  Grid3x3,
+  Maximize,
+  Move,
+  MousePointer2,
+  RotateCw,
+  Settings,
+} from "lucide-react";
 
-const inputClass = cn(
-  "w-full rounded-2xl px-4 py-3 text-sm",
-  "bg-white/80 border border-primary/20",
-  "text-foreground placeholder:text-muted-foreground/70",
-  "outline-none backdrop-blur-sm",
-  "focus:border-primary/60 focus:ring-4 focus:ring-primary/15",
-  "transition",
-);
-
-const labelClass = "mb-1.5 block text-sm font-medium text-foreground";
-
-interface FormState {
-  name: string;
-  description: string;
-  coverUrl: string;
-  sceneURL: string;
-  featured: boolean;
-  published: boolean;
-}
+// Left tool shelf — Blender-style tool affordances. Placeholders for now; the
+// real editor only edits world metadata (via the settings popup).
+const TOOLS = [
+  { icon: MousePointer2, label: "Select" },
+  { icon: Move, label: "Move" },
+  { icon: RotateCw, label: "Rotate" },
+  { icon: Maximize, label: "Scale" },
+  { icon: Grid3x3, label: "Toggle grid" },
+  { icon: Box, label: "Add object" },
+];
 
 export function WorldEditPage() {
   const { worldID } = useParams<{ worldID: string }>();
-  const navigate = useNavigate();
-
-  const [form, setForm] = useState<FormState>({
-    name: "",
-    description: "",
-    coverUrl: "",
-    sceneURL: "",
-    featured: false,
-    published: false,
-  });
-  const [loading, setLoading] = useState(true);
+  const [world, setWorld] = useState<World | null>(null);
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">(
+    "loading",
+  );
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    if (!worldID) return;
+    if (!worldID) {
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
     api<{ world: World }>(`/api/admin/worlds/${worldID}`)
       .then((r) => {
-        setForm({
-          name: r.world.name,
-          description: r.world.description,
-          coverUrl: r.world.coverUrl ?? "",
-          sceneURL: r.world.sceneURL ?? "",
-          featured: r.world.featured,
-          published: r.world.published,
-        });
+        setWorld(r.world);
+        setStatus("loaded");
       })
-      .catch((err) => setError(errorMessage(err)))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        setError(errorMessage(err));
+        setStatus("error");
+      });
   }, [worldID]);
 
-  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  async function save() {
-    setError(null);
-    setNotice(null);
-    setBusy(true);
-    try {
-      await api(`/api/admin/worlds/${worldID}`, {
-        method: "PATCH",
-        body: form,
-      });
-      navigate("/admin/world-manager");
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
-
-  async function del() {
-    if (!window.confirm("Delete this world? This cannot be undone.")) return;
-    setError(null);
-    setBusy(true);
-    try {
-      await api(`/api/admin/worlds/${worldID}`, { method: "DELETE" });
-      navigate("/admin/world-manager");
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
-
-  if (loading) {
+  if (status === "loading") {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-background">
-        <HeroBackdrop />
-        <main className="relative z-10 mx-auto max-w-2xl px-5 py-16">
-          <p className="text-muted-foreground">Loading…</p>
-        </main>
+      <div className="flex h-screen items-center justify-center bg-neutral-950 text-white/60">
+        Loading world…
+      </div>
+    );
+  }
+
+  if (status === "error" || !world) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-neutral-950 px-6 text-center">
+        <h1 className="text-xl font-semibold text-white">World not found</h1>
+        <p className="max-w-sm text-sm text-white/50">{error}</p>
+        <Link
+          to="/admin/world-manager"
+          className="mt-2 text-sm font-medium text-[#0abab5] hover:underline"
+        >
+          Back to world manager
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <HeroBackdrop />
-      <main className="relative z-10 mx-auto max-w-2xl px-5 py-16">
-        <div className="flex items-center justify-between">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-neutral-950 text-white">
+      {/* ── Top bar ─────────────────────────────────────────── */}
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-neutral-900 px-3">
+        <div className="flex items-center gap-3">
           <Link
             to="/admin/world-manager"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-sm text-white/60 transition-colors hover:text-white"
           >
             <ArrowLeft className="size-4" /> World manager
           </Link>
+          <span className="text-white/25">/</span>
+          <h1 className="truncate text-sm font-medium">{world.name}</h1>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-primary/15 bg-white/75 p-7 shadow-xl shadow-primary/10 backdrop-blur-xl sm:p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Edit world</h1>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
+        >
+          <Settings className="size-4" /> World Settings
+        </button>
+      </header>
 
-          {notice && <p className="mt-3 text-sm text-[#078b87]">{notice}</p>}
-          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-
-          <div className="mt-6 flex flex-col gap-4">
-            <div>
-              <label className={labelClass} htmlFor="name">
-                Name
-              </label>
-              <input
-                id="name"
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass} htmlFor="description">
-                Description
-              </label>
-              <textarea
-                id="description"
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-                rows={3}
-                className={cn(inputClass, "resize-none")}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass} htmlFor="coverUrl">
-                Cover image URL
-              </label>
-              <input
-                id="coverUrl"
-                value={form.coverUrl}
-                onChange={(e) => set("coverUrl", e.target.value)}
-                placeholder="https://…"
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass} htmlFor="sceneURL">
-                Scene URL
-              </label>
-              <input
-                id="sceneURL"
-                value={form.sceneURL}
-                onChange={(e) => set("sceneURL", e.target.value)}
-                placeholder="https://… (optional .glb scene)"
-                className={inputClass}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
-              <label className="flex items-center gap-2.5 text-sm font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  checked={form.featured}
-                  onChange={(e) => set("featured", e.target.checked)}
-                  className="size-4 accent-[#0abab5]"
-                />
-                Featured
-              </label>
-              <label className="flex items-center gap-2.5 text-sm font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  checked={form.published}
-                  onChange={(e) => set("published", e.target.checked)}
-                  className="size-4 accent-[#0abab5]"
-                />
-                Published
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-7 flex items-center gap-2 border-t border-primary/10 pt-5">
-            <Button onClick={save} disabled={busy || !form.name.trim()} className="gap-2">
-              <Save className="size-4" /> {busy ? "Saving…" : "Save changes"}
-            </Button>
+      {/* ── Body: tool rail + viewport ──────────────────────── */}
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-neutral-900 py-2">
+          {TOOLS.map(({ icon: Icon, label }) => (
             <button
-              onClick={del}
-              disabled={busy}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+              key={label}
+              title={label}
+              aria-label={label}
+              className="flex size-9 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
             >
-              <Trash2 className="size-4" /> Delete
+              <Icon className="size-5" />
             </button>
-          </div>
-        </div>
-      </main>
+          ))}
+        </aside>
+
+        <main className="relative min-w-0 flex-1">
+          <WorldViewport placeURL={world.sceneURL} />
+        </main>
+      </div>
+
+      {/* ── Bottom status bar ───────────────────────────────── */}
+      <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-white/10 bg-neutral-900 px-3 text-xs text-white/50">
+        <span className="truncate font-mono text-white/40">{world.id}</span>
+        {world.featured && (
+          <span className="rounded bg-[#0abab5]/20 px-1.5 py-0.5 text-[10px] font-medium text-[#2fe0da]">
+            Featured
+          </span>
+        )}
+        <span className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/60">
+          {world.published ? "Published" : "Draft"}
+        </span>
+        <span className="ml-auto text-white/30">
+          Drag to orbit · Scroll to zoom
+        </span>
+      </footer>
+
+      <WorldSettingsDialog
+        open={settingsOpen}
+        world={world}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }
