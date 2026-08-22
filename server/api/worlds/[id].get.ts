@@ -1,13 +1,15 @@
 import { defineEventHandler, getRouterParam, createError } from "nitro/h3";
-import { ensureDb, isValidObjectId } from "../../utils/mongoose";
+import { ensureDb } from "../../utils/mongoose";
+import { decodePublicId } from "../../utils/hashids";
 import { World } from "../../models/World";
 import { toPublicWorld } from "../../utils/worlds";
 import { getSessionUser } from "../../utils/auth";
 
 /** Public world lookup — admins can preview drafts; members see published only. */
 export default defineEventHandler(async (event) => {
-  const id = getRouterParam(event, "id");
-  if (!id || !isValidObjectId(id)) {
+  const rawId = getRouterParam(event, "id");
+  const id = rawId ? decodePublicId(rawId) : null;
+  if (!id) {
     throw createError({ statusCode: 404, statusMessage: "World not found" });
   }
 

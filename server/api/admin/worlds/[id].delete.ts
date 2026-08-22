@@ -1,13 +1,15 @@
 import { defineEventHandler, getRouterParam, createError } from "nitro/h3";
 import { requireRole } from "../../../utils/auth";
-import { ensureDb, isValidObjectId } from "../../../utils/mongoose";
+import { ensureDb } from "../../../utils/mongoose";
+import { decodePublicId } from "../../../utils/hashids";
 import { World } from "../../../models/World";
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, "admin");
 
-  const id = getRouterParam(event, "id");
-  if (!id || !isValidObjectId(id)) {
+  const rawId = getRouterParam(event, "id");
+  const id = rawId ? decodePublicId(rawId) : null;
+  if (!id) {
     throw createError({ statusCode: 404, statusMessage: "World not found" });
   }
 

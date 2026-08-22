@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody, getRouterParam, createError } from "nitro/h3";
 import { requireRole } from "../../../utils/auth";
-import { ensureDb, isValidObjectId } from "../../../utils/mongoose";
+import { ensureDb } from "../../../utils/mongoose";
+import { decodePublicId } from "../../../utils/hashids";
 import { World, type WorldDoc } from "../../../models/World";
 import { toPublicWorld } from "../../../utils/worlds";
 
@@ -19,7 +20,8 @@ export default defineEventHandler(async (event) => {
       }
     | undefined;
 
-  if (!id || !isValidObjectId(id)) {
+  const objectId = id ? decodePublicId(id) : null;
+  if (!objectId) {
     throw createError({ statusCode: 404, statusMessage: "World not found" });
   }
 
@@ -45,7 +47,7 @@ export default defineEventHandler(async (event) => {
   if (body?.published !== undefined) updates.published = !!body.published;
 
   await ensureDb();
-  const world = await World.findByIdAndUpdate(id, updates, {
+  const world = await World.findByIdAndUpdate(objectId, updates, {
     new: true,
     runValidators: true,
   });
