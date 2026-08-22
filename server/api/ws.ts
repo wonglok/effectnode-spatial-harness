@@ -7,7 +7,6 @@ import type {
   ChatMessage,
 } from "../../shared/types/realtime";
 import { createIdentity } from "../utils/identity";
-import { publishEvent, subscribeEvents } from "../utils/redis";
 
 /** Map of placeId → Map<peerId, PlayerState> */
 const rooms = new Map<string, Map<string, PlayerState>>();
@@ -15,7 +14,7 @@ const rooms = new Map<string, Map<string, PlayerState>>();
 /** Reverse lookup: peer.id → placeId */
 const peerRoom = new Map<string, string>();
 
-/** Local peers in each room — used for Redis rebroadcast */
+/** Local peers in each room — used to broadcast leave events after disconnect. */
 const roomPeers = new Map<
   string,
   Set<{ send: (data: string) => void; id: string }>
@@ -23,29 +22,6 @@ const roomPeers = new Map<
 
 /** Next monotonic id for chat messages. */
 let chatSeq = 0;
-
-// ── Redis cross-instance relay ───────────────────────────────────────────
-
-const unsubRedis = await subscribeEvents((placeId, payload) => {
-  const peers = roomPeers.get(placeId);
-  if (!peers || peers.size === 0) return;
-
-  const raw = JSON.stringify(payload);
-
-  // Handle room state sync for join/leave events from other instances
-  if (payload.t === "join") {
-    if (!rooms.has(placeId)) rooms.set(placeId, new Map());
-    rooms.get(placeId)!.set(payload.peer.id, { ...payload.peer });
-  } else if (payload.t === "leave") {
-    rooms.get(placeId)?.delete(payload.id);
-    if (rooms.get(placeId)?.size === 0) rooms.delete(placeId);
-  }
-
-  // Rebroadcast to all local peers in the room
-  for (const peer of peers) {
-    peer.send(raw);
-  }
-});
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -98,7 +74,7 @@ export default defineWebSocketHandler({
         peerRoom.set(identity.id, placeId);
         peer.subscribe(placeId);
 
-        // Track local peer for Redis rebroadcast
+        // Track local peer for leave broadcasts
         if (!roomPeers.has(placeId)) roomPeers.set(placeId, new Set());
         roomPeers
           .get(placeId)!
@@ -126,10 +102,9 @@ export default defineWebSocketHandler({
 
         send(peer, { t: "welcome", self: identity, peers });
 
-        // Broadcast join to other local peers (excludes sender) + Redis
+        // Broadcast join to other local peers (excludes sender)
         const joinMsg: ServerMessage = { t: "join", peer: playerState };
         peer.publish(placeId, JSON.stringify(joinMsg));
-        publishEvent(placeId, joinMsg);
         break;
       }
 
@@ -165,7 +140,6 @@ export default defineWebSocketHandler({
         };
 
         peer.publish(placeId, JSON.stringify(moveMsg));
-        publishEvent(placeId, moveMsg);
         break;
       }
 
@@ -192,9 +166,8 @@ export default defineWebSocketHandler({
         // Echo back to sender
         send(peer, chatPayload);
 
-        // Broadcast to other local peers (excludes sender) + Redis
+        // Broadcast to other local peers (excludes sender)
         peer.publish(placeId, JSON.stringify(chatPayload));
-        publishEvent(placeId, chatPayload);
         break;
       }
 
@@ -221,9 +194,8 @@ export default defineWebSocketHandler({
         // Echo back to sender
         send(peer, voicePayload);
 
-        // Broadcast to other local peers (excludes sender) + Redis
+        // Broadcast to other local peers (excludes sender)
         peer.publish(placeId, JSON.stringify(voicePayload));
-        publishEvent(placeId, voicePayload);
         break;
       }
 
@@ -320,5 +292,4 @@ function leaveRoom(peerId: string, placeId: string) {
 
   const leaveMsg: ServerMessage = { t: "leave", id: peerId };
   broadcastLocal(placeId, leaveMsg);
-  publishEvent(placeId, leaveMsg);
 }
