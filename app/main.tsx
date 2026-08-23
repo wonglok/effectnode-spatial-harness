@@ -6,7 +6,7 @@ import "@fontsource-variable/geist-mono/index.css";
 import "@fontsource-variable/space-grotesk/index.css";
 import "./index.css";
 import { LandingPage } from "@/pages/landing";
-import { GamePage } from "@/pages/game";
+import { WorldView } from "@/pages/world-view";
 import { LoginPage } from "@/pages/login";
 import { RegisterPage } from "@/pages/register";
 import { VerifyEmailPage } from "@/pages/verify-email";
@@ -14,7 +14,6 @@ import { AccountPage } from "@/pages/account";
 import { AdminPage } from "@/pages/admin";
 import { UserManagementPage } from "@/pages/user-management";
 import { WorldManagerPage } from "@/pages/world-manager";
-import { WorldViewPage } from "@/pages/world-view";
 import { WorldEditPage } from "@/pages/world-edit";
 import { RequireAuth, RequireRole } from "@/components/auth/require-role";
 import { useAuthStore } from "@/stores/auth";
@@ -74,7 +73,7 @@ createRoot(document.getElementById("root")!).render(
           path="/world/:worldID"
           element={
             <RequireAuth>
-              <GamePage />
+              <WorldView />
             </RequireAuth>
           }
         />
@@ -82,7 +81,7 @@ createRoot(document.getElementById("root")!).render(
           path="/world/:worldID/view"
           element={
             <RequireAuth>
-              <GamePage />
+              <WorldView />
             </RequireAuth>
           }
         />

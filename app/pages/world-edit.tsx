@@ -14,6 +14,7 @@ import {
   RotateCw,
   Settings,
 } from "lucide-react";
+import { GameWorld } from "@/components/metaverse/world";
 
 // Left tool shelf — Blender-style tool affordances. Placeholders for now; the
 // real editor only edits world metadata (via the settings popup).
@@ -114,7 +115,7 @@ export function WorldEditPage() {
         </aside>
 
         <main className="relative min-w-0 flex-1">
-          <WorldViewport placeURL={world.sceneURL} />
+          <GameWorld />
         </main>
       </div>
 

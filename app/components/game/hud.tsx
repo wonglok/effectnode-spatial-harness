@@ -203,9 +203,11 @@ function NameEditDialog({
 interface MenuPanelProps {
   playerName: string;
   avatarThumb: string | null;
+  isAdmin: boolean;
   onOpenNameEditor: () => void;
   onOpenAvatar: () => void;
   onToggleChat: () => void;
+  onEditWorld: () => void;
   onLeave: () => void;
   onClose: () => void;
 }
@@ -213,9 +215,11 @@ interface MenuPanelProps {
 function MenuPanel({
   playerName,
   avatarThumb,
+  isAdmin,
   onOpenNameEditor,
   onOpenAvatar,
   onToggleChat,
+  onEditWorld,
   onLeave,
   onClose,
 }: MenuPanelProps) {
@@ -352,6 +356,34 @@ function MenuPanel({
 
       <div className="h-px bg-white/[0.08] mx-2" />
 
+      {isAdmin && (
+        <button
+          onClick={() => {
+            onEditWorld();
+            onClose();
+          }}
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 hover:bg-white/[0.06] hover:text-white transition cursor-pointer text-left w-full"
+          role="menuitem"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 text-white/40"
+          >
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+          </svg>
+          Edit World
+        </button>
+      )}
+
+      <div className="h-px bg-white/[0.08] mx-2" />
+
       <button
         onClick={onLeave}
         className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-rose-300/80 hover:bg-rose-400/[0.08] hover:text-rose-200 transition cursor-pointer text-left w-full"
@@ -383,16 +415,20 @@ function MenuPanel({
 function HUDMenu({
   playerName,
   avatarThumb,
+  isAdmin,
   onSaveName,
   onOpenAvatar,
   onToggleChat,
+  onEditWorld,
   onLeave,
 }: {
   playerName: string;
   avatarThumb: string | null;
+  isAdmin: boolean;
   onSaveName: (name: string) => void;
   onOpenAvatar: () => void;
   onToggleChat: () => void;
+  onEditWorld: () => void;
   onLeave: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -472,9 +508,11 @@ function HUDMenu({
           <MenuPanel
             playerName={playerName}
             avatarThumb={avatarThumb}
+            isAdmin={isAdmin}
             onOpenNameEditor={() => setNameDialogOpen(true)}
             onOpenAvatar={onOpenAvatar}
             onToggleChat={onToggleChat}
+            onEditWorld={onEditWorld}
             onLeave={onLeave}
             onClose={close}
           />
@@ -503,9 +541,11 @@ interface GameHUDProps {
   onlineCount: number;
   playerName: string;
   avatarThumb: string | null;
+  isAdmin: boolean;
   onSaveName: (name: string) => void;
   onOpenAvatar: () => void;
   onToggleChat: () => void;
+  onEditWorld: () => void;
   onLeave: () => void;
 }
 
@@ -515,9 +555,11 @@ export function GameHUD({
   onlineCount,
   playerName,
   avatarThumb,
+  isAdmin,
   onSaveName,
   onOpenAvatar,
   onToggleChat,
+  onEditWorld,
   onLeave,
 }: GameHUDProps) {
   return (
@@ -531,9 +573,11 @@ export function GameHUD({
       <HUDMenu
         playerName={playerName}
         avatarThumb={avatarThumb}
+        isAdmin={isAdmin}
         onSaveName={onSaveName}
         onOpenAvatar={onOpenAvatar}
         onToggleChat={onToggleChat}
+        onEditWorld={onEditWorld}
         onLeave={onLeave}
       />
     </div>

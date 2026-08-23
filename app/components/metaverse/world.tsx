@@ -45,7 +45,6 @@ extend(THREE as any);
 // ── Scene ──────────────────────────────────────────────────────────────────
 
 interface GameWorldProps {
-  placeId: string;
   avatarUrl?: string | null;
   placeURL?: string | null;
 }
@@ -166,7 +165,10 @@ function MyScene({
   }, []);
 
   // Directional light follows player
-  const lightOffset = useMemo(() => new THREE.Vector3(20, 35, 40), []);
+  const lightOffset = useMemo(
+    () => new THREE.Vector3(20, 35, 40).multiplyScalar(5),
+    [],
+  );
   const lookAt3a = useMemo(() => new THREE.Vector3(0, 0, 0), []);
   const lookAt3b = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
@@ -278,16 +280,16 @@ function MyScene({
         intensity={2}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-bias={-1e-9 - 0.0005}
+        shadow-bias={-1e-9 - 0.05}
         shadow-normalBias={0.05}
         shadow-radius={3}
-        shadow-camera-left={-100}
-        shadow-camera-bottom={-100}
-        shadow-camera-right={100}
-        shadow-camera-top={100}
+        shadow-camera-left={-200}
+        shadow-camera-bottom={-200}
+        shadow-camera-right={200}
+        shadow-camera-top={200}
       />
 
-      <ambientLight intensity={0.4} />
+      {/* <ambientLight intensity={0.4} /> */}
 
       <CameraController thetaRef={thetaRef} phiRef={phiRef} distRef={distRef} />
 
@@ -322,28 +324,7 @@ function MyScene({
         </Suspense>
       )}
 
-      {/* Moving platforms */}
-      <KinematicPlatform
-        position={[6, 1, -2]}
-        motion={{ axis: "x", amplitude: 5, speed: 0.25 }}
-        onReady={registerPlatform}
-      >
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[4, 0.3, 4]} />
-          <meshStandardNodeMaterial color="#e8ad40" roughness={0.3} />
-        </mesh>
-      </KinematicPlatform>
-
-      <KinematicPlatform
-        position={[-6, 1, -2]}
-        motion={{ axis: "z", amplitude: 5, speed: 0.25 }}
-        onReady={registerPlatform}
-      >
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[4, 0.3, 4]} />
-          <meshStandardNodeMaterial color="#40a4e8" roughness={0.3} />
-        </mesh>
-      </KinematicPlatform>
+      <ExtraContent registerPlatform={registerPlatform}></ExtraContent>
 
       {/* Local player */}
       <group
@@ -378,11 +359,40 @@ function MyScene({
   );
 }
 
-export function GameWorld({
-  placeId: _placeId,
-  avatarUrl,
-  placeURL,
-}: GameWorldProps) {
+function ExtraContent({
+  registerPlatform,
+}: {
+  registerPlatform: (v: MovingPlatform) => () => void;
+}) {
+  return (
+    <>
+      {/* Moving platforms */}
+      <KinematicPlatform
+        position={[6, 1, -2]}
+        motion={{ axis: "x", amplitude: 5, speed: 0.25 }}
+        onReady={registerPlatform}
+      >
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[4, 0.3, 4]} />
+          <meshStandardNodeMaterial color="#e8ad40" roughness={0.3} />
+        </mesh>
+      </KinematicPlatform>
+
+      <KinematicPlatform
+        position={[-6, 1, -2]}
+        motion={{ axis: "z", amplitude: 5, speed: 0.25 }}
+        onReady={registerPlatform}
+      >
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[4, 0.3, 4]} />
+          <meshStandardNodeMaterial color="#40a4e8" roughness={0.3} />
+        </mesh>
+      </KinematicPlatform>
+    </>
+  );
+}
+
+export function GameWorld({ avatarUrl, placeURL }: GameWorldProps) {
   //
 
   const keysRef = useRef({
