@@ -3,7 +3,7 @@ import { requireRole } from "../../../utils/auth";
 import { ensureDb } from "../../../utils/mongoose";
 import { decodePublicId } from "../../../utils/hashids";
 import { World, type WorldDoc } from "../../../models/World";
-import { toPublicWorld } from "../../../utils/worlds";
+import { toPublicWorld, normalizeProps } from "../../../utils/worlds";
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, "admin");
@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
         description?: unknown;
         coverUrl?: unknown;
         sceneURL?: unknown;
+        props?: unknown;
         featured?: unknown;
         published?: unknown;
       }
@@ -42,6 +43,9 @@ export default defineEventHandler(async (event) => {
   }
   if (body?.sceneURL !== undefined) {
     updates.sceneURL = body.sceneURL ? String(body.sceneURL).trim() : null;
+  }
+  if (body?.props !== undefined) {
+    updates.props = normalizeProps(body.props);
   }
   if (body?.featured !== undefined) updates.featured = !!body.featured;
   if (body?.published !== undefined) updates.published = !!body.published;

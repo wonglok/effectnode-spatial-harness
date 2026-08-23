@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { api, errorMessage } from "@/lib/api";
 import type { World } from "../../shared/types/world";
 import { WorldViewport } from "@/components/world-edit/world-viewport";
 import { WorldSettingsDialog } from "@/components/world-edit/world-settings-dialog";
+import { AssetDrawer } from "@/components/world-edit/asset-drawer";
+import { useWorldEditorStore } from "@/stores/world-editor";
 import {
   ArrowLeft,
   Box,
+  Eye,
   Grid3x3,
   Maximize,
   Move,
@@ -14,7 +17,6 @@ import {
   RotateCw,
   Settings,
 } from "lucide-react";
-import { GameWorld } from "@/components/metaverse/world";
 
 // Left tool shelf — Blender-style tool affordances. Placeholders for now; the
 // real editor only edits world metadata (via the settings popup).
@@ -29,6 +31,7 @@ const TOOLS = [
 
 export function WorldEditPage() {
   const { worldID } = useParams<{ worldID: string }>();
+  const navigate = useNavigate();
   const [world, setWorld] = useState<World | null>(null);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     "loading",
@@ -45,6 +48,7 @@ export function WorldEditPage() {
     api<{ world: World }>(`/api/admin/worlds/${worldID}`)
       .then((r) => {
         setWorld(r.world);
+        useWorldEditorStore.getState().init(r.world);
         setStatus("loaded");
       })
       .catch((err) => {
@@ -52,6 +56,22 @@ export function WorldEditPage() {
         setStatus("error");
       });
   }, [worldID]);
+
+  // Delete / Backspace removes the currently selected prop.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const state = useWorldEditorStore.getState();
+      if (state.selectedId) {
+        e.preventDefault();
+        state.removeProp(state.selectedId);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (status === "loading") {
     return (
@@ -91,12 +111,20 @@ export function WorldEditPage() {
           <h1 className="truncate text-sm font-medium">{world.name}</h1>
         </div>
 
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
-        >
-          <Settings className="size-4" /> World Settings
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`/world/${world.id}/view`)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
+          >
+            <Eye className="size-4" /> View world
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
+          >
+            <Settings className="size-4" /> World Settings
+          </button>
+        </div>
       </header>
 
       {/* ── Body: tool rail + viewport ──────────────────────── */}
@@ -115,8 +143,13 @@ export function WorldEditPage() {
         </aside>
 
         <main className="relative min-w-0 flex-1">
-          <GameWorld />
+          <WorldViewport />
         </main>
+      </div>
+
+      {/* ── Bottom asset drawer ─────────────────────────────── */}
+      <div className="absolute inset-x-0 bottom-7 left-12 z-20">
+        <AssetDrawer worldId={world.id} />
       </div>
 
       {/* ── Bottom status bar ───────────────────────────────── */}

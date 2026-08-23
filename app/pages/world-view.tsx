@@ -148,8 +148,8 @@ export function WorldView() {
 
       {/* ── 3D World ──────────────────────────────────────────── */}
       <GameWorld
-        avatarUrl={avatarUrl}
-        placeURL={world.sceneURL ?? "/assets/place/church.glb"}
+      // avatarUrl={avatarUrl}
+      // placeURL={world.sceneURL ?? "/assets/place/church.glb"}
       />
 
       {/* ── Center-bottom mic button ──────────────────────────── */}

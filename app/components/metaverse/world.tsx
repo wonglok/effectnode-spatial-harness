@@ -1,9 +1,8 @@
 import { DoubleSide, Euler, Vector3 } from "three/webgpu";
 // import * as TSL from "three/tsl";
-import { extend, type ThreeToJSXElements } from "@react-three/fiber";
 import * as THREE from "three/webgpu";
-import { useRef, useEffect, Suspense, useMemo } from "react";
-import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { useRef, useEffect, Suspense, useMemo, useCallback } from "react";
+import { useThree, useFrame } from "@react-three/fiber";
 import { useMetaverseStore } from "@/stores/metaverse";
 import { PlayerCharacter } from "./player-character";
 import { RemoteAvatar } from "./other-avatar";
@@ -27,26 +26,21 @@ import {
   PHYSICS_STEPS,
   PLAYER_CAPSULE,
 } from "./scene-defaults";
-import { WebGPURenderer } from "three/webgpu";
 // import { HDRLoader } from "three/examples/jsm/Addons.js";
 // import { equirectUV, texture, uv, vec3, vec4 } from "three/tsl";
 // import { Fn } from "three/src/nodes/TSL.js";
 import { EffectsSSGI } from "./render-pipeline";
-import { GLBEnv } from "./GLBEnv";
+import { WebGPUCanvas } from "./webgpu-canvas";
+import { GLBModel } from "./glb-model";
 // import { DiamindComponent, Spinner } from "./DiamondTSL/DiamondComponent";
 // import { diamondRand } from "./DiamondTSL/DiamondGo";
-
-declare module "@react-three/fiber" {
-  interface ThreeElements extends ThreeToJSXElements<typeof THREE> {}
-}
-
-extend(THREE as any);
 
 // ── Scene ──────────────────────────────────────────────────────────────────
 
 interface GameWorldProps {
   avatarUrl?: string | null;
   placeURL?: string | null;
+  isEditor?: boolean;
 }
 
 interface MySceneProps {
@@ -68,11 +62,11 @@ interface MySceneProps {
 }
 
 function MyScene({
+  avatarUrl,
   placeURL = "/assets/place/church.glb",
   keysRef,
   spacePressedRef,
   joystickInputRef,
-  avatarUrl,
 }: MySceneProps) {
   const playerRef = useRef<THREE.Group>(null);
   const movingPlatformsRef = useRef<MovingPlatform[]>([]);
@@ -263,14 +257,14 @@ function MyScene({
   });
 
   // Platform registration helper
-  const registerPlatform = (p: MovingPlatform) => {
+  const registerPlatform = useCallback((p: MovingPlatform) => {
     const arr = movingPlatformsRef.current;
     arr.push(p);
     return () => {
       const i = arr.indexOf(p);
       if (i !== -1) arr.splice(i, 1);
     };
-  };
+  }, []);
 
   return (
     <>
@@ -289,19 +283,7 @@ function MyScene({
         shadow-camera-top={200}
       />
 
-      {/* <ambientLight intensity={0.4} /> */}
-
       <CameraController thetaRef={thetaRef} phiRef={phiRef} distRef={distRef} />
-
-      {/* <group
-        rotation={[Math.PI * 0.25, 0, 0]}
-        position={[0, 2.3, -32.5]}
-        scale={3}
-      >
-        <Spinner>
-          <DiamindComponent name="diam_1"></DiamindComponent>
-        </Spinner>
-      </group> */}
 
       {placeURL && (
         <Suspense
@@ -319,12 +301,10 @@ function MyScene({
           }
         >
           <KinematicPlatform onReady={registerPlatform}>
-            <GLBEnv src={placeURL} receiveShadow castShadow />
+            <GLBModel src={placeURL} receiveShadow castShadow />
           </KinematicPlatform>
         </Suspense>
       )}
-
-      <ExtraContent registerPlatform={registerPlatform}></ExtraContent>
 
       {/* Local player */}
       <group
@@ -366,6 +346,8 @@ function ExtraContent({
 }) {
   return (
     <>
+      <WaterPlane />
+
       {/* Moving platforms */}
       <KinematicPlatform
         position={[6, 1, -2]}
@@ -392,7 +374,7 @@ function ExtraContent({
   );
 }
 
-export function GameWorld({ avatarUrl, placeURL }: GameWorldProps) {
+export function GameWorld({ isEditor = false }: GameWorldProps) {
   //
 
   const keysRef = useRef({
@@ -411,44 +393,17 @@ export function GameWorld({ avatarUrl, placeURL }: GameWorldProps) {
     <div className="absolute top-0  left-0 w-full h-full overflow-hidden touch-manipulation select-none">
       {/*  */}
 
-      <Canvas
-        shadows
-        dpr={[1, 1.25]}
-        camera={{ fov: 60, near: 0.5, far: 500 }}
-        gl={async (props) => {
-          const renderer = new WebGPURenderer({
-            ...(props as any),
-            depth: true,
-            antialias: true,
-            stencil: false,
-            requiredLimits: {
-              maxColorAttachmentBytesPerSample: 64, // Example override
-            },
-          });
-
-          await renderer.init();
-
-          renderer.setSize(window.innerWidth, window.innerHeight);
-          renderer.setPixelRatio(
-            Math.min(1.25, window.devicePixelRatio || 1.0),
-          );
-
-          return renderer;
-        }}
-      >
+      <WebGPUCanvas camera={{ fov: 60, near: 0.5, far: 500 }}>
         <EffectsSSGI>
           <Suspense fallback={null}>
-            <WaterPlane />
             <MyScene
-              placeURL={placeURL}
               keysRef={keysRef}
               spacePressedRef={spacePressedRef}
               joystickInputRef={joystickInputRef}
-              avatarUrl={avatarUrl}
             />
           </Suspense>
         </EffectsSSGI>
-      </Canvas>
+      </WebGPUCanvas>
 
       <JoystickControls
         keysRef={keysRef}

@@ -48,13 +48,18 @@ export function EffectsSSGI({ children = null }: { children: any }) {
     if (gl?.domElement?.parentElement?.parentElement) {
       gl.domElement.parentElement.parentElement.appendChild(stats.dom);
     }
+
+    let id: any;
+
     let rr = () => {
       stats.update();
-      requestAnimationFrame(rr);
+      id = requestAnimationFrame(rr);
     };
-    requestAnimationFrame(rr);
+    id = requestAnimationFrame(rr);
 
     return () => {
+      cancelAnimationFrame(id);
+
       gl?.domElement?.parentElement?.parentElement?.removeChild(stats.dom);
     };
   }, []);
