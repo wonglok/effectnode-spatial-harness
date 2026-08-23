@@ -153,7 +153,9 @@ export function AssetDrawer() {
   const persist = useWorldEditorStore((s) => s.persist);
   const hdriUrl = useWorldEditorStore((s) => s.hdriUrl);
   const setHdriUrl = useWorldEditorStore((s) => s.setHdriUrl);
-  const environmentIntensity = useWorldEditorStore((s) => s.environmentIntensity);
+  const environmentIntensity = useWorldEditorStore(
+    (s) => s.environmentIntensity,
+  );
   const setEnvironmentIntensity = useWorldEditorStore(
     (s) => s.setEnvironmentIntensity,
   );
@@ -306,8 +308,8 @@ export function AssetDrawer() {
           ) : tab === "lighting" ? (
             <div className="flex flex-col gap-3">
               <p className="text-xs text-white/50">
-                Upload an <code className="text-white/70">.hdr</code> environment
-                map and tune its lighting intensity.
+                Upload an <code className="text-white/70">.hdr</code>{" "}
+                environment map and tune its lighting intensity.
               </p>
               <div className="flex items-center gap-2">
                 <button

@@ -5,7 +5,7 @@ import { useAvatarStore } from "@/stores/avatar";
 import { useAuthStore } from "@/stores/auth";
 import { api } from "@/lib/api";
 import type { World } from "../../shared/types/world";
-import { GameWorld } from "@/components/metaverse/world";
+import { GameWorld } from "@/components/metaverse/game-world";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { VoiceRecordButton } from "@/components/chat/voice-record-button";
 import { VRMPicker } from "@/components/metaverse/VRMAvatar";
@@ -118,6 +118,8 @@ export function WorldView() {
           let search = new URLSearchParams(location.search);
           if (search.get("from") === "admin-world-manager") {
             navigate("/admin/world-manager");
+          } else if (search.get("from") === "world-editor") {
+            navigate(`/world/${worldID}/edit`);
           } else {
             navigate("/");
           }

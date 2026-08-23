@@ -15,6 +15,7 @@ import { AdminPage } from "@/pages/admin";
 import { UserManagementPage } from "@/pages/user-management";
 import { WorldManagerPage } from "@/pages/world-manager";
 import { WorldEditPage } from "@/pages/world-edit";
+import { AssetManagerPage } from "@/pages/asset-manager";
 import { RequireAuth, RequireRole } from "@/components/auth/require-role";
 import { useAuthStore } from "@/stores/auth";
 
@@ -90,6 +91,14 @@ createRoot(document.getElementById("root")!).render(
           element={
             <RequireRole role="admin">
               <WorldEditPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/world/:worldID/assets"
+          element={
+            <RequireRole role="admin">
+              <AssetManagerPage />
             </RequireRole>
           }
         />

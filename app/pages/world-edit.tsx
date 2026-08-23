@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Box,
   Eye,
+  FolderOpen,
   Grid3x3,
   Maximize,
   Move,
@@ -113,7 +114,9 @@ export function WorldEditPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate(`/world/${world.id}/view`)}
+            onClick={() =>
+              navigate(`/world/${world.id}/view?from=world-editor`)
+            }
             className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
           >
             <Eye className="size-4" /> View world
@@ -140,6 +143,14 @@ export function WorldEditPage() {
               <Icon className="size-5" />
             </button>
           ))}
+          <button
+            onClick={() => navigate(`/world/${worldID}/assets`)}
+            title="Asset manager"
+            aria-label="Asset manager"
+            className="mt-auto flex size-9 items-center justify-center rounded-md text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <FolderOpen className="size-5" />
+          </button>
         </aside>
 
         <main className="relative min-w-0 flex-1">
