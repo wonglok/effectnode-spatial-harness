@@ -56,6 +56,8 @@ interface AssetManagerState {
   loadFiles: (worldId: string) => Promise<void>;
   uploadFiles: (worldId: string, files: File[]) => Promise<void>;
   deleteFile: (worldId: string, fileId: string) => Promise<void>;
+  deleteAllFiles: (worldId: string) => Promise<void>;
+  generateThumbnails: (worldId: string) => Promise<void>;
   loadThreads: (worldId: string) => Promise<void>;
   createThread: (worldId: string) => Promise<string | null>;
   selectThread: (worldId: string, threadId: string) => Promise<void>;
@@ -237,6 +239,50 @@ export const useAssetManagerStore = create<AssetManagerState>((set, get) => ({
     } catch (e) {
       set({ filesError: errorMessage(e) });
     }
+  },
+
+  deleteAllFiles: async (worldId) => {
+    set({ filesError: null });
+    try {
+      await api(`/api/admin/worlds/${worldId}/assets`, { method: "DELETE" });
+      await get().loadFiles(worldId);
+    } catch (e) {
+      set({ filesError: errorMessage(e) });
+    }
+  },
+
+  generateThumbnails: async (worldId) => {
+    const targets = get().files.filter(
+      (f) => !f.thumbnailUrl && /\.(glb|gltf)$/i.test(f.name),
+    );
+    if (targets.length === 0) return;
+    set({ filesError: null });
+
+    for (const f of targets) {
+      try {
+        const res = await api<{
+          thumbnailUploadUrl: string;
+          thumbnailUrl: string;
+        }>(`/api/admin/worlds/${worldId}/assets/${f.id}/thumbnail`, {
+          method: "POST",
+          body: {},
+        });
+        const dataUrl = await generateModelThumbnail(f.url);
+        await fetch(res.thumbnailUploadUrl, {
+          method: "PUT",
+          body: dataUrlToBlob(dataUrl),
+          headers: { "Content-Type": "image/png" },
+        });
+        await api(`/api/admin/worlds/${worldId}/assets/${f.id}`, {
+          method: "PATCH",
+          body: { thumbnailUrl: res.thumbnailUrl },
+        });
+      } catch (e) {
+        set({ filesError: errorMessage(e) });
+      }
+    }
+
+    await get().loadFiles(worldId);
   },
 
   loadThreads: async (worldId) => {

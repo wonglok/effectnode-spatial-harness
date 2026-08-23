@@ -117,11 +117,11 @@ export function AssetManagerPage() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-80 shrink-0 border-r border-white/10 bg-neutral-900/50">
-          <FileManager worldId={worldID!} />
-        </div>
         <div className="min-w-0 flex-1">
           <ChatPanel worldId={worldID!} />
+        </div>
+        <div className="w-80 shrink-0 border-l border-white/10 bg-neutral-900/50">
+          <FileManager worldId={worldID!} />
         </div>
       </div>
     </div>
