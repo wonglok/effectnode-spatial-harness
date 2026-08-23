@@ -39,6 +39,16 @@ export default defineEventHandler(async (event) => {
   const uploadUrl = await presignUpload(key, contentType);
   const url = s3PublicUrl(key);
 
+  // 3D models get a rendered thumbnail (generated client-side after upload).
+  const isModel = /\.(glb|gltf)$/i.test(filename);
+  let thumbnailUploadUrl: string | null = null;
+  let thumbnailUrl: string | null = null;
+  if (isModel) {
+    const thumbKey = `worlds/${id}/assets/thumbnails/${randomUUID()}.png`;
+    thumbnailUploadUrl = await presignUpload(thumbKey, "image/png");
+    thumbnailUrl = s3PublicUrl(thumbKey);
+  }
+
   await ensureDb();
   const doc = await FileSystem.create({
     worldId: id,
@@ -47,7 +57,15 @@ export default defineEventHandler(async (event) => {
     url,
     contentType,
     size,
+    thumbnailUrl,
   });
 
-  return { uploadUrl, key, url, contentType, fileId: doc._id.toString() };
+  return {
+    uploadUrl,
+    thumbnailUploadUrl,
+    key,
+    url,
+    contentType,
+    fileId: doc._id.toString(),
+  };
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
@@ -13,6 +13,37 @@ export function AssetManagerPage() {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+
+  const uploadFiles = useAssetManagerStore((s) => s.uploadFiles);
+  const [dragActive, setDragActive] = useState(false);
+  const dragDepth = useRef(0);
+
+  function onDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current += 1;
+    if (dragDepth.current === 1) setDragActive(true);
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+  function onDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setDragActive(false);
+    }
+  }
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragActive(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0 && worldID) {
+      uploadFiles(worldID, files);
+    }
+  }
 
   useEffect(() => {
     if (!worldID) {
@@ -58,7 +89,21 @@ export function AssetManagerPage() {
   }
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-neutral-950 text-white">
+    <div
+      className="relative flex h-screen flex-col overflow-hidden bg-neutral-950 text-white"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-[#0abab5] bg-[#0abab5]/10 backdrop-blur-sm">
+          <p className="rounded-xl bg-neutral-900/90 px-4 py-2 text-sm font-medium text-white">
+            Drop files to upload
+          </p>
+        </div>
+      )}
+
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-neutral-900 px-3">
         <Link
           to={`/world/${worldID}/edit`}

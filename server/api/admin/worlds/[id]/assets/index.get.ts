@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
       key: f.key,
       contentType: f.contentType,
       size: f.size,
+      thumbnailUrl: f.thumbnailUrl,
       createdAt: f.createdAt,
     })),
   };

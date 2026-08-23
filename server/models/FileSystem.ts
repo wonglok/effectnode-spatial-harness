@@ -14,6 +14,7 @@ export interface FileSystemDoc {
   url: string;
   contentType: string;
   size: number;
+  thumbnailUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +29,7 @@ const fileSystemSchema = new Schema<FileSystemDoc>(
     url: { type: String, required: true },
     contentType: { type: String, default: "application/octet-stream" },
     size: { type: Number, default: 0 },
+    thumbnailUrl: { type: String, default: null },
   },
   { timestamps: true },
 );
