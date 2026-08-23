@@ -1,0 +1,345 @@
+"use client";
+
+import { useRef, useEffect, Suspense, useMemo, useCallback } from "react";
+import { useThree, useFrame } from "@react-three/fiber";
+import { DoubleSide, Euler, Vector3 } from "three/webgpu";
+import * as THREE from "three/webgpu";
+import { useMetaverseStore } from "@/stores/metaverse";
+import { PlayerCharacter } from "./player-character";
+import { RemoteAvatar } from "./other-avatar";
+import { KinematicPlatform } from "./kinematic-platform";
+import { GLBModel } from "./glb-model";
+import { ExtraContent } from "./extra-content";
+import {
+  updatePlayerPhysics,
+  resetPlayer,
+  type PlayerPhysicsState,
+  type MovingPlatform,
+} from "./physics";
+import {
+  CameraController,
+  DEFAULT_DIST,
+  LERP_SPEED,
+  LOOK_TARGET_Y,
+} from "./camera-controller";
+import {
+  PHYSICS_PARAMS,
+  PHYSICS_STEPS,
+  PLAYER_CAPSULE,
+} from "./scene-defaults";
+import type { WorldProp } from "../../../shared/types/world";
+
+export interface MySceneProps {
+  keysRef: React.RefObject<{
+    fwd: boolean;
+    bkd: boolean;
+    lft: boolean;
+    rgt: boolean;
+    space: boolean;
+  }>;
+  spacePressedRef: React.RefObject<boolean>;
+  joystickInputRef: React.RefObject<{
+    active: boolean;
+    angle: number;
+    force: number;
+  }>;
+  avatarUrl?: string | null;
+  placeURL?: string | null;
+  /** Editor-placed props rendered in the live world. */
+  props?: WorldProp[];
+}
+
+export function MyScene({
+  avatarUrl,
+  placeURL = "/assets/place/church.glb",
+  props = [],
+  keysRef,
+  spacePressedRef,
+  joystickInputRef,
+}: MySceneProps) {
+  const playerRef = useRef<THREE.Group>(null);
+  const movingPlatformsRef = useRef<MovingPlatform[]>([]);
+  const physicsStateRef = useRef<PlayerPhysicsState>({
+    velocity: new THREE.Vector3(),
+    isOnGround: false,
+    offGroundTimer: 0,
+    walkAnimation: 0,
+  });
+  const thetaRef = useRef(0);
+  const phiRef = useRef(0.5);
+  const distRef = useRef(DEFAULT_DIST);
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+  const { camera } = useThree();
+  const selfName = useMetaverseStore((s) => s.self?.name);
+  const players = useMetaverseStore((s) => s.players);
+
+  // Keyboard input
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const map: Record<string, keyof typeof keysRef.current> = {
+        KeyW: "fwd",
+        KeyA: "lft",
+        KeyS: "bkd",
+        KeyD: "rgt",
+        ArrowUp: "fwd",
+        ArrowLeft: "lft",
+        ArrowDown: "bkd",
+        ArrowRight: "rgt",
+        Space: "space",
+      };
+
+      const key = map[e.code];
+      if (key) {
+        keysRef.current[key] = e.type === "keydown";
+        if (key === "space" && e.type === "keydown") {
+          spacePressedRef.current = true;
+        }
+        e.preventDefault();
+      }
+      if (e.type === "keyup") {
+        spacePressedRef.current = false;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKey);
+    };
+  }, []);
+
+  // Broadcast position — throttled to ≤2 sends per 2s, only when moving
+  useEffect(() => {
+    const MIN_DELTA = 0.1;
+    const MIN_INTERVAL = 2000;
+
+    let lastSentPos = new Vector3();
+    let lastSentRot = 0;
+    let lastSentTime = 0;
+    let raf: number;
+
+    function tick() {
+      const player = playerRef.current;
+      if (!player) return;
+
+      const pos = player.position;
+      const euler = new Euler().setFromQuaternion(player.quaternion);
+      const now = new Date().getTime();
+
+      const moved =
+        Math.abs(pos.x - lastSentPos.x) > MIN_DELTA ||
+        Math.abs(pos.y - lastSentPos.y) > MIN_DELTA ||
+        Math.abs(pos.z - lastSentPos.z) > MIN_DELTA ||
+        Math.abs(euler.y - lastSentRot) > 0.001;
+
+      if (moved && now - lastSentTime >= MIN_INTERVAL) {
+        useMetaverseStore
+          .getState()
+          .sendMove(pos.x, pos.y, pos.z, euler.y, avatarUrl ?? undefined);
+        lastSentPos.copy(pos);
+        lastSentRot = euler.y;
+        lastSentTime = now;
+      }
+
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Directional light follows player
+  const lightOffset = useMemo(
+    () => new THREE.Vector3(20, 35, 40).multiplyScalar(5),
+    [],
+  );
+  const lookAt3a = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+  const lookAt3b = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+
+  useFrame(() => {
+    const player = playerRef.current;
+    const light = lightRef.current;
+    if (!player || !light) return;
+    light.target.position.copy(player.position);
+    light.position.copy(player.position).add(lightOffset);
+  });
+
+  // Physics + camera update (single useFrame — camera runs after physics)
+  useFrame((_, delta) => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const clampedDelta = Math.min(delta, 0.1);
+    const stepDelta = clampedDelta / PHYSICS_STEPS;
+
+    const joystick = joystickInputRef.current;
+    const walkAngle = joystick.active
+      ? thetaRef.current + (joystick.angle + Math.PI * -0.5)
+      : thetaRef.current;
+
+    const keys = joystick.active
+      ? {
+          fwd: true,
+          bkd: false,
+          lft: false,
+          rgt: false,
+          space: keysRef.current.space,
+        }
+      : keysRef.current;
+
+    const params = joystick.active
+      ? {
+          ...PHYSICS_PARAMS,
+          playerSpeed: PHYSICS_PARAMS.playerSpeed * joystick.force,
+        }
+      : PHYSICS_PARAMS;
+
+    for (let i = 0; i < PHYSICS_STEPS; i++) {
+      updatePlayerPhysics(
+        stepDelta,
+        player,
+        PLAYER_CAPSULE,
+        physicsStateRef.current,
+        // staticBVH,
+        movingPlatformsRef.current,
+        keys,
+        spacePressedRef.current,
+        walkAngle,
+        params,
+      );
+    }
+
+    if (player.position.y < -25) {
+      resetPlayer(
+        player,
+        physicsStateRef.current,
+        new THREE.Vector3(8, 10, 2.5),
+      );
+    }
+
+    // Camera — after physics so it reads the final position this frame
+    const px = player.position.x;
+    const py = player.position.y;
+    const pz = player.position.z;
+    const theta = thetaRef.current;
+    const phi = phiRef.current;
+    const dist = distRef.current;
+
+    const targetX = px + dist * Math.sin(phi) * Math.sin(theta);
+    const targetY = py + dist * Math.cos(phi);
+    const targetZ = pz + dist * Math.sin(phi) * Math.cos(theta);
+
+    const camT = 1 - Math.exp(-LERP_SPEED * clampedDelta);
+    camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), camT);
+
+    lookAt3a.copy(player.position);
+    lookAt3a.y += LOOK_TARGET_Y;
+    lookAt3b.lerp(lookAt3a, 0.1);
+
+    lookAt3b.x = THREE.MathUtils.lerp(lookAt3b.x, lookAt3a.x, 0.25);
+    lookAt3b.z = THREE.MathUtils.lerp(lookAt3b.z, lookAt3a.z, 0.25);
+
+    camera.lookAt(lookAt3b);
+
+    //
+    //
+    // camera.lookAt(px, py + LOOK_TARGET_Y, pz);
+  });
+
+  // Platform registration helper
+  const registerPlatform = useCallback((p: MovingPlatform) => {
+    const arr = movingPlatformsRef.current;
+    arr.push(p);
+    return () => {
+      const i = arr.indexOf(p);
+      if (i !== -1) arr.splice(i, 1);
+    };
+  }, []);
+
+  return (
+    <>
+      <directionalLight
+        ref={lightRef}
+        color={"#ffffff"}
+        intensity={2}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-1e-9 - 0.05}
+        shadow-normalBias={0.05}
+        shadow-radius={3}
+        shadow-camera-left={-200}
+        shadow-camera-bottom={-200}
+        shadow-camera-right={200}
+        shadow-camera-top={200}
+      />
+
+      <CameraController thetaRef={thetaRef} phiRef={phiRef} distRef={distRef} />
+
+      {placeURL && (
+        <Suspense
+          fallback={
+            <KinematicPlatform onReady={registerPlatform}>
+              <mesh receiveShadow position={[0, -0.25, 0]}>
+                <cylinderGeometry args={[100, 100, 0.5]} />
+                <meshStandardNodeMaterial
+                  color="#ffffff"
+                  side={DoubleSide}
+                  roughness={1.0}
+                />
+              </mesh>
+            </KinematicPlatform>
+          }
+        >
+          <KinematicPlatform onReady={registerPlatform}>
+            <GLBModel src={placeURL} receiveShadow castShadow />
+          </KinematicPlatform>
+        </Suspense>
+      )}
+
+      {/* Editor-placed props */}
+      {props.map((prop) => (
+        <group
+          key={prop.id}
+          position={prop.position}
+          rotation={prop.rotation}
+          scale={prop.scale}
+        >
+          <Suspense fallback={null}>
+            <GLBModel src={prop.url} />
+          </Suspense>
+        </group>
+      ))}
+
+      {/* <ExtraContent registerPlatform={registerPlatform} /> */}
+
+      {/* Local player */}
+      <group
+        ref={playerRef}
+        position={[0, 2, 0]}
+        rotation={[0, Math.PI * -0.5, 0]}
+      >
+        <Suspense fallback={null}>
+          <group rotation={[0, 0.5 * Math.PI, 0]}>
+            <PlayerCharacter
+              name={selfName}
+              isMe={true}
+              state={physicsStateRef.current}
+              spacePressedRef={spacePressedRef}
+              avatarUrl={avatarUrl}
+            />
+          </group>
+        </Suspense>
+      </group>
+
+      {/* Remote players */}
+      {players.map((p) => {
+        return (
+          <group key={p.id}>
+            <Suspense fallback={null}>
+              <RemoteAvatar player={p} />
+            </Suspense>
+          </group>
+        );
+      })}
+    </>
+  );
+}

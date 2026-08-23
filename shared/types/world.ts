@@ -15,6 +15,8 @@ export interface World {
   description: string;
   coverUrl: string | null;
   sceneURL: string | null;
+  hdriUrl: string | null;
+  environmentIntensity: number;
   props: WorldProp[];
   featured: boolean;
   published: boolean;

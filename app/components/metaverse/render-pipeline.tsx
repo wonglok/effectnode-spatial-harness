@@ -19,7 +19,19 @@ import { Scene } from "three/webgpu";
 import { WebGLRenderer, EquirectangularReflectionMapping } from "three";
 import { HDRLoader } from "three/examples/jsm/Addons.js";
 
-export function EffectsSSGI({ children = null }: { children: any }) {
+interface EffectsSSGIProps {
+  children?: any;
+  /** HDR environment map URL. Defaults to the bundled sky. */
+  hdriUrl?: string;
+  /** HDR environment lighting intensity (live-updatable). */
+  environmentIntensity?: number;
+}
+
+export function EffectsSSGI({
+  children = null,
+  hdriUrl = "/assets/place/sky.hdr",
+  environmentIntensity = 0.35,
+}: EffectsSSGIProps) {
   const [ready, setReady] = useState(false);
   let gl = useThree((r) => r.gl) as
     | (
@@ -64,6 +76,7 @@ export function EffectsSSGI({ children = null }: { children: any }) {
     };
   }, []);
 
+  // Render pipeline (once).
   useEffect(() => {
     if (!scene || !camera || !gl) {
       return;
@@ -104,29 +117,48 @@ export function EffectsSSGI({ children = null }: { children: any }) {
     };
     frame = requestAnimationFrame(hh);
 
-    const loader = new HDRLoader();
-    loader.loadAsync(`/assets/place/sky.hdr`).then((sky) => {
-      sky.mapping = EquirectangularReflectionMapping;
-
-      const prm = new PMREMGenerator(gl as any);
-      prm.compileEquirectangularShader();
-      const rtt = prm.fromEquirectangular(sky);
-
-      scene.environment = rtt.texture;
-      scene.environmentIntensity = 0.35;
-      scene.background = rtt.texture;
-      scene.backgroundIntensity = 0.5;
-
-      setTimeout(() => {
-        setReady(true);
-      });
-    });
-
     return () => {
       cancelAnimationFrame(frame);
       pipe.dispose();
     };
   }, [scene, camera, gl]);
+
+  // Environment + background map (re-loads when the HDR URL changes).
+  useEffect(() => {
+    if (!scene || !gl) return;
+    let cancelled = false;
+
+    const loader = new HDRLoader();
+    loader
+      .loadAsync(hdriUrl)
+      .then((sky) => {
+        if (cancelled) return;
+        sky.mapping = EquirectangularReflectionMapping;
+
+        const prm = new PMREMGenerator(gl as any);
+        prm.compileEquirectangularShader();
+        const rtt = prm.fromEquirectangular(sky);
+
+        scene.environment = rtt.texture;
+        scene.background = rtt.texture;
+        scene.backgroundIntensity = 0.5;
+
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scene, gl, hdriUrl]);
+
+  // Lighting intensity — live-updatable via the node-material observer.
+  useEffect(() => {
+    if (!scene) return;
+    scene.environmentIntensity = environmentIntensity;
+  }, [scene, environmentIntensity]);
 
   useFrame(() => {}, 11);
 

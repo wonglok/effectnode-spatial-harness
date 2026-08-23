@@ -7,6 +7,7 @@ import {
   GripVertical,
   Package,
   Save,
+  Sun,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -14,7 +15,7 @@ import { useWorldEditorStore, type LibraryItem } from "@/stores/world-editor";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type Tab = "environment" | "props";
+type Tab = "environment" | "props" | "lighting";
 
 /** Presign + upload a single model file to the world-assets bucket. */
 async function uploadWorldAsset(
@@ -136,7 +137,7 @@ function PlacedPropRow({
   );
 }
 
-export function AssetDrawer({ worldId }: { worldId: string }) {
+export function AssetDrawer() {
   const open = useWorldEditorStore((s) => s.drawerOpen);
   const setOpen = useWorldEditorStore((s) => s.setDrawerOpen);
   const sceneURL = useWorldEditorStore((s) => s.sceneURL);
@@ -149,8 +150,13 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
   const selectProp = useWorldEditorStore((s) => s.selectProp);
   const removeProp = useWorldEditorStore((s) => s.removeProp);
   const saving = useWorldEditorStore((s) => s.saving);
-  const setSaving = useWorldEditorStore((s) => s.setSaving);
-  const setSavedAt = useWorldEditorStore((s) => s.setSavedAt);
+  const persist = useWorldEditorStore((s) => s.persist);
+  const hdriUrl = useWorldEditorStore((s) => s.hdriUrl);
+  const setHdriUrl = useWorldEditorStore((s) => s.setHdriUrl);
+  const environmentIntensity = useWorldEditorStore((s) => s.environmentIntensity);
+  const setEnvironmentIntensity = useWorldEditorStore(
+    (s) => s.setEnvironmentIntensity,
+  );
 
   const [tab, setTab] = useState<Tab>("props");
   const [busy, setBusy] = useState<Tab | null>(null);
@@ -159,6 +165,7 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
 
   const envInputRef = useRef<HTMLInputElement>(null);
   const propInputRef = useRef<HTMLInputElement>(null);
+  const hdrInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File | undefined, kind: Tab) {
     if (!file) return;
@@ -170,6 +177,9 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
       if (kind === "environment") {
         setSceneURL(publicUrl);
         setNotice("Environment updated — press Save to persist.");
+      } else if (kind === "lighting") {
+        setHdriUrl(publicUrl);
+        setNotice("HDR updated — press Save to persist.");
       } else {
         addLibraryItem({ id: crypto.randomUUID(), name, url: publicUrl });
         setNotice(`Added “${name}”. Drag it onto the scene to place it.`);
@@ -180,24 +190,18 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
       setBusy(null);
       if (envInputRef.current) envInputRef.current.value = "";
       if (propInputRef.current) propInputRef.current.value = "";
+      if (hdrInputRef.current) hdrInputRef.current.value = "";
     }
   }
 
   async function save() {
     setError(null);
     setNotice(null);
-    setSaving(true);
     try {
-      await api(`/api/admin/worlds/${worldId}`, {
-        method: "PATCH",
-        body: { sceneURL, props },
-      });
-      setSavedAt(Date.now());
+      await persist();
       setNotice("Saved.");
     } catch (err) {
       setError(errorMessage(err));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -221,6 +225,12 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
             onClick={() => setTab("environment")}
           >
             <Globe className="size-3.5" /> Environment
+          </button>
+          <button
+            className={tabBtn(tab === "lighting")}
+            onClick={() => setTab("lighting")}
+          >
+            <Sun className="size-3.5" /> Lighting
           </button>
           <button
             className={tabBtn(tab === "props")}
@@ -291,6 +301,63 @@ export function AssetDrawer({ worldId }: { worldId: string }) {
                 accept=".glb,.gltf"
                 className="hidden"
                 onChange={(e) => handleFile(e.target.files?.[0], "environment")}
+              />
+            </div>
+          ) : tab === "lighting" ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-white/50">
+                Upload an <code className="text-white/70">.hdr</code> environment
+                map and tune its lighting intensity.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => hdrInputRef.current?.click()}
+                  disabled={busy === "lighting"}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/15 disabled:opacity-50"
+                >
+                  <Upload className="size-3.5" />
+                  {busy === "lighting" ? "Uploading…" : "Upload HDR"}
+                </button>
+                {hdriUrl && (
+                  <>
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-white/40">
+                      {hdriUrl}
+                    </span>
+                    <button
+                      onClick={() => setHdriUrl(null)}
+                      title="Reset to default sky"
+                      className="rounded p-1 text-white/40 transition-colors hover:text-white"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <label className="flex items-center gap-3 text-xs text-white/60">
+                <span className="shrink-0">Intensity</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={environmentIntensity}
+                  onChange={(e) =>
+                    setEnvironmentIntensity(Number(e.target.value))
+                  }
+                  className="min-w-0 flex-1 accent-[#0abab5]"
+                />
+                <span className="w-10 shrink-0 text-right font-mono text-white/70">
+                  {environmentIntensity.toFixed(2)}
+                </span>
+              </label>
+
+              <input
+                ref={hdrInputRef}
+                type="file"
+                accept=".hdr"
+                className="hidden"
+                onChange={(e) => handleFile(e.target.files?.[0], "lighting")}
               />
             </div>
           ) : (

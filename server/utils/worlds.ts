@@ -37,6 +37,13 @@ export function normalizeProps(input: unknown): WorldPropDoc[] {
   return out;
 }
 
+/** Clamp an untrusted environment-intensity value to a sane [0, 10] range. */
+export function normalizeEnvironmentIntensity(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0.35;
+  return Math.min(10, Math.max(0, n));
+}
+
 function toPublicProp(raw: unknown): WorldProp {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return {
@@ -57,6 +64,8 @@ export function toPublicWorld(doc: WorldDocument): World {
     description: doc.description ?? "",
     coverUrl: doc.coverUrl ?? null,
     sceneURL: doc.sceneURL ?? null,
+    hdriUrl: doc.hdriUrl ?? null,
+    environmentIntensity: normalizeEnvironmentIntensity(doc.environmentIntensity),
     props: Array.isArray(doc.props) ? doc.props.map(toPublicProp) : [],
     featured: doc.featured ?? false,
     published: doc.published ?? false,

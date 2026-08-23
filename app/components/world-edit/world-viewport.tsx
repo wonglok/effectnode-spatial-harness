@@ -297,6 +297,8 @@ export function WorldViewport() {
   const bridge = useRef<EditorBridge>({});
   const endDrag = useWorldEditorStore((s) => s.endDrag);
   const addProp = useWorldEditorStore((s) => s.addProp);
+  const hdriUrl = useWorldEditorStore((s) => s.hdriUrl);
+  const environmentIntensity = useWorldEditorStore((s) => s.environmentIntensity);
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     if (!useWorldEditorStore.getState().dragItem) return;
@@ -343,7 +345,10 @@ export function WorldViewport() {
       <WebGPUCanvas
         camera={{ fov: 50, near: 0.1, far: 500, position: [12, 10, 12] }}
       >
-        <EffectsSSGI>
+        <EffectsSSGI
+          hdriUrl={hdriUrl ?? undefined}
+          environmentIntensity={environmentIntensity}
+        >
           <Suspense fallback={null}>
             <EditorScene bridge={bridge} />
           </Suspense>

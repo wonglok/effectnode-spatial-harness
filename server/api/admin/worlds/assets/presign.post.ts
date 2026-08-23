@@ -4,11 +4,12 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireRole } from "../../../../utils/auth";
 
-const ALLOWED_EXT = new Set(["glb", "gltf"]);
+const ALLOWED_EXT = new Set(["glb", "gltf", "hdr"]);
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   glb: "model/gltf-binary",
   gltf: "model/gltf+json",
+  hdr: "image/vnd.radiance",
 };
 
 /**
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
   if (!ALLOWED_EXT.has(ext)) {
     throw createError({
       statusCode: 400,
-      statusMessage: "Only .glb and .gltf models are allowed",
+      statusMessage: "Only .glb, .gltf and .hdr files are allowed",
     });
   }
 

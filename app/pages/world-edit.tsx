@@ -149,7 +149,7 @@ export function WorldEditPage() {
 
       {/* ── Bottom asset drawer ─────────────────────────────── */}
       <div className="absolute inset-x-0 bottom-7 left-12 z-20">
-        <AssetDrawer worldId={world.id} />
+        <AssetDrawer />
       </div>
 
       {/* ── Bottom status bar ───────────────────────────────── */}

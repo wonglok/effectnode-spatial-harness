@@ -3,7 +3,11 @@ import { requireRole } from "../../../utils/auth";
 import { ensureDb } from "../../../utils/mongoose";
 import { decodePublicId } from "../../../utils/hashids";
 import { World, type WorldDoc } from "../../../models/World";
-import { toPublicWorld, normalizeProps } from "../../../utils/worlds";
+import {
+  toPublicWorld,
+  normalizeProps,
+  normalizeEnvironmentIntensity,
+} from "../../../utils/worlds";
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, "admin");
@@ -15,6 +19,8 @@ export default defineEventHandler(async (event) => {
         description?: unknown;
         coverUrl?: unknown;
         sceneURL?: unknown;
+        hdriUrl?: unknown;
+        environmentIntensity?: unknown;
         props?: unknown;
         featured?: unknown;
         published?: unknown;
@@ -43,6 +49,14 @@ export default defineEventHandler(async (event) => {
   }
   if (body?.sceneURL !== undefined) {
     updates.sceneURL = body.sceneURL ? String(body.sceneURL).trim() : null;
+  }
+  if (body?.hdriUrl !== undefined) {
+    updates.hdriUrl = body.hdriUrl ? String(body.hdriUrl).trim() : null;
+  }
+  if (body?.environmentIntensity !== undefined) {
+    updates.environmentIntensity = normalizeEnvironmentIntensity(
+      body.environmentIntensity,
+    );
   }
   if (body?.props !== undefined) {
     updates.props = normalizeProps(body.props);

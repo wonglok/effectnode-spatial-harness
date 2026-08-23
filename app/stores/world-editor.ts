@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { api } from "@/lib/api";
 import type { World, WorldProp } from "../../shared/types/world";
 
 /** An uploaded model available in the library, ready to be placed. */
@@ -9,8 +10,13 @@ export interface LibraryItem {
 }
 
 interface WorldEditorState {
+  worldId: string | null;
   /** Environment GLB currently shown in the viewport. */
   sceneURL: string | null;
+  /** HDR environment map (lighting/sky). Null falls back to the default sky. */
+  hdriUrl: string | null;
+  /** HDR environment lighting intensity. */
+  environmentIntensity: number;
   /** Placed prop instances. */
   props: WorldProp[];
   /** Uploaded prop models available to drag into the scene. */
@@ -26,6 +32,8 @@ interface WorldEditorState {
 
   init: (world: World) => void;
   setSceneURL: (url: string | null) => void;
+  setHdriUrl: (url: string | null) => void;
+  setEnvironmentIntensity: (n: number) => void;
   addLibraryItem: (item: LibraryItem) => void;
   removeLibraryItem: (id: string) => void;
   addProp: (prop: WorldProp) => void;
@@ -37,10 +45,15 @@ interface WorldEditorState {
   endDrag: () => void;
   setSaving: (saving: boolean) => void;
   setSavedAt: (ts: number | null) => void;
+  /** Persist the current scene + props + HDR config to the server. */
+  persist: () => Promise<void>;
 }
 
-export const useWorldEditorStore = create<WorldEditorState>((set) => ({
+export const useWorldEditorStore = create<WorldEditorState>((set, get) => ({
+  worldId: null,
   sceneURL: null,
+  hdriUrl: null,
+  environmentIntensity: 0.35,
   props: [],
   library: [],
   selectedId: null,
@@ -51,7 +64,10 @@ export const useWorldEditorStore = create<WorldEditorState>((set) => ({
 
   init: (world) =>
     set({
+      worldId: world.id,
       sceneURL: world.sceneURL,
+      hdriUrl: world.hdriUrl,
+      environmentIntensity: world.environmentIntensity ?? 0.35,
       props: world.props ?? [],
       selectedId: null,
       dragItem: null,
@@ -61,8 +77,11 @@ export const useWorldEditorStore = create<WorldEditorState>((set) => ({
 
   setSceneURL: (url) => set({ sceneURL: url }),
 
-  addLibraryItem: (item) =>
-    set((s) => ({ library: [...s.library, item] })),
+  setHdriUrl: (url) => set({ hdriUrl: url }),
+
+  setEnvironmentIntensity: (n) => set({ environmentIntensity: n }),
+
+  addLibraryItem: (item) => set((s) => ({ library: [...s.library, item] })),
 
   removeLibraryItem: (id) =>
     set((s) => ({
@@ -70,18 +89,23 @@ export const useWorldEditorStore = create<WorldEditorState>((set) => ({
       dragItem: s.dragItem?.id === id ? null : s.dragItem,
     })),
 
-  addProp: (prop) => set((s) => ({ props: [...s.props, prop] })),
+  addProp: (prop) => {
+    set((s) => ({ props: [...s.props, prop] }));
+    get().persist().catch(() => {});
+  },
 
   updateProp: (id, patch) =>
     set((s) => ({
       props: s.props.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     })),
 
-  removeProp: (id) =>
+  removeProp: (id) => {
     set((s) => ({
       props: s.props.filter((p) => p.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+    get().persist().catch(() => {});
+  },
 
   selectProp: (id) => set({ selectedId: id }),
 
@@ -94,4 +118,19 @@ export const useWorldEditorStore = create<WorldEditorState>((set) => ({
   setSaving: (saving) => set({ saving }),
 
   setSavedAt: (ts) => set({ savedAt: ts }),
+
+  persist: async () => {
+    const { worldId, sceneURL, props, hdriUrl, environmentIntensity } = get();
+    if (!worldId) return;
+    set({ saving: true });
+    try {
+      await api(`/api/admin/worlds/${worldId}`, {
+        method: "PATCH",
+        body: { sceneURL, props, hdriUrl, environmentIntensity },
+      });
+      set({ savedAt: Date.now() });
+    } finally {
+      set({ saving: false });
+    }
+  },
 }));

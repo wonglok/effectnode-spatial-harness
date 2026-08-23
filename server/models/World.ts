@@ -18,6 +18,8 @@ export interface WorldDoc {
   description: string;
   coverUrl: string | null;
   sceneURL: string | null;
+  hdriUrl: string | null;
+  environmentIntensity: number;
   props: WorldPropDoc[];
   featured: boolean;
   published: boolean;
@@ -31,6 +33,8 @@ const worldSchema = new Schema<WorldDoc>(
     description: { type: String, default: "", trim: true, maxlength: 1000 },
     coverUrl: { type: String, default: null },
     sceneURL: { type: String, default: null },
+    hdriUrl: { type: String, default: null },
+    environmentIntensity: { type: Number, default: 0.35 },
     // Stored as a plain array of objects (no per-prop _id) so client-generated
     // `id`s round-trip verbatim; validated in `normalizeProps`.
     props: { type: [Schema.Types.Mixed], default: [] } as any,

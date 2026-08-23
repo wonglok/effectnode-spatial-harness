@@ -2,7 +2,11 @@ import { defineEventHandler, readBody, createError } from "nitro/h3";
 import { requireRole } from "../../utils/auth";
 import { ensureDb } from "../../utils/mongoose";
 import { World } from "../../models/World";
-import { toPublicWorld, normalizeProps } from "../../utils/worlds";
+import {
+  toPublicWorld,
+  normalizeProps,
+  normalizeEnvironmentIntensity,
+} from "../../utils/worlds";
 
 export default defineEventHandler(async (event) => {
   await requireRole(event, "admin");
@@ -13,6 +17,8 @@ export default defineEventHandler(async (event) => {
         description?: unknown;
         coverUrl?: unknown;
         sceneURL?: unknown;
+        hdriUrl?: unknown;
+        environmentIntensity?: unknown;
         props?: unknown;
         featured?: unknown;
         published?: unknown;
@@ -30,6 +36,8 @@ export default defineEventHandler(async (event) => {
     description: String(body?.description ?? "").trim().slice(0, 1000),
     coverUrl: body?.coverUrl ? String(body.coverUrl).trim() : null,
     sceneURL: body?.sceneURL ? String(body.sceneURL).trim() : null,
+    hdriUrl: body?.hdriUrl ? String(body.hdriUrl).trim() : null,
+    environmentIntensity: normalizeEnvironmentIntensity(body?.environmentIntensity),
     props: normalizeProps(body?.props),
     featured: !!body?.featured,
     published: !!body?.published,
