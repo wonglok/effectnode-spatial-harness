@@ -5,23 +5,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshBVH, ObjectBVH } from "three-mesh-bvh";
 import type { MovingPlatform } from "./physics";
 
-/** Cheap numeric fingerprint of a group's mesh topology — which meshes exist
- *  and which geometries they use. Changes when a sync source (e.g. Blender)
- *  adds, removes, or replaces meshes, which refit() can't handle. */
-function topologySignature(root: THREE.Object3D): number {
-  let sig = 0;
-  root.traverse((c) => {
-    const mesh = c as THREE.Mesh;
-    if (!mesh.isMesh || !mesh.geometry) return;
-    const u = mesh.geometry.uuid;
-    for (let i = 0; i < u.length; i++) sig = (sig * 33) ^ u.charCodeAt(i);
-    const n = mesh.name;
-    for (let i = 0; i < n.length; i++) sig = (sig * 33) ^ n.charCodeAt(i);
-    sig = (sig * 33) | 0;
-  });
-  return sig;
-}
-
 interface KinematicPlatformProps {
   /** GLB model URL. If omitted, children are used as the platform geometry. */
   url?: string;
@@ -37,6 +20,11 @@ interface KinematicPlatformProps {
    *  Return the unregister function from onReady to handle cleanup. */
   onReady?: (platform: MovingPlatform) => () => void;
   children?: ReactNode;
+  /** When this value changes after mount, the BVH collider is rebuilt from the
+   *  current children. Use for asynchronously-populated scenes (e.g. Blender
+   *  mesh sync) where meshes are added / moved / replaced over time — refit()
+   *  only handles transform changes, not topology changes. */
+  rebuildSignal?: unknown;
 }
 
 /**
@@ -53,6 +41,7 @@ export function KinematicPlatform({
   position = [0, 0, 0],
   motion = { axis: "x", amplitude: 0, speed: 0 },
   onReady,
+  rebuildSignal,
   children,
   scale = 1,
 }: KinematicPlatformProps) {
@@ -61,7 +50,9 @@ export function KinematicPlatform({
   const bvhRef = useRef<ObjectBVH | null>(null);
   const velocity = useRef(new THREE.Vector3());
   const unregisterRef = useRef<(() => void) | null>(null);
-  const lastTopologyRef = useRef(0);
+  // Set once the initial collider is built — rebuildSignal only triggers
+  // rebuilds, never the very first build (the "ready" poll owns that).
+  const hasBuiltRef = useRef(false);
 
   const buildBVH = useCallback(() => {
     const group = groupRef.current;
@@ -83,6 +74,7 @@ export function KinematicPlatform({
 
     const bvh = new ObjectBVH(group, { maxLeafTris: 1 });
     bvhRef.current = bvh;
+    hasBuiltRef.current = true;
 
     const platform: MovingPlatform = {
       group,
@@ -126,6 +118,14 @@ export function KinematicPlatform({
     };
   }, []);
 
+  // Rebuild the collider whenever the sync source reports a change. The next
+  // frame guarantees any reparenting / mesh updates have committed first.
+  useEffect(() => {
+    if (!hasBuiltRef.current) return;
+    const id = setTimeout(() => buildBVH(), 0);
+    return () => clearTimeout(id);
+  }, [rebuildSignal, buildBVH]);
+
   // Animate using wall-clock time so all peers stay in sync without network
   useFrame(() => {
     const group = groupRef.current;
@@ -156,17 +156,11 @@ export function KinematicPlatform({
     if (axis !== "y") group.position.y = position[1];
     if (axis !== "z") group.position.z = position[2];
 
-    // Rebuild the collider when mesh topology changes (Blender sync adds,
-    // removes, or replaces meshes); otherwise refit so shapecast sees the
-    // updated transforms.
-    const sig = topologySignature(group);
-    if (sig !== lastTopologyRef.current) {
-      lastTopologyRef.current = sig;
-      buildBVH();
-    } else {
-      group.updateMatrixWorld();
-      bvhRef.current?.refit();
-    }
+    // Refit BVH so shapecast sees the updated position. Topology changes
+    // (meshes added / moved / replaced by Blender sync) are handled by the
+    // rebuildSignal effect instead — refit() only handles transforms.
+    group.updateMatrixWorld();
+    bvhRef.current?.refit();
   });
 
   return <group ref={groupRef}>{children}</group>;

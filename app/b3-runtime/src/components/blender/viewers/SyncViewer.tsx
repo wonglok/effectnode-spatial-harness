@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useThree } from "@react-three/fiber";
 import { useBlenderStore } from "../../stores/blenderStore";
 import {
@@ -11,7 +11,10 @@ import {
 } from "../../utils/meshBuilder";
 import type { BlenderObject } from "../../types/blenderTypes";
 import { LightFromData } from "../canvas-units/LightFromData";
-import { useMeshSync } from "../canvas-units/useMeshSync";
+import {
+  useMeshSync,
+  type ResolvedTextures,
+} from "../canvas-units/useMeshSync";
 import { useEnvironmentMap } from "../canvas-units/useEnvironmentMap";
 
 // ---------------------------------------------------------------------------
@@ -108,23 +111,15 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
     };
   }, []);
 
-  // Hand the (stable) sync container to the caller once so it can attach it
-  // inside a collider. The container fills in as Blender data streams in.
-  useEffect(() => {
-    if (onSyncGroup) {
-      onSyncGroup(group.o3d);
-    }
-  }, [onSyncGroup, group]);
   // ------------------------------------------------------------------
   // Sync meshes from Blender data (with InstancedMesh batching)
   // ------------------------------------------------------------------
-  useMeshSync({
-    scene: group.o3d!,
-    objects: sceneData.objects,
-    // Colliders need plain meshes — InstancedMesh per-instance transforms
-    // are not reflected in matrixWorld, which physics reads for collision.
-    singleInstance: !!onSyncGroup,
-    resolveTextures: (obj: BlenderObject) => ({
+  // Callbacks are memoized so useMeshSync's effect only re-runs when Blender
+  // data actually changes. Passing inline arrows would re-run the sync on every
+  // SyncViewer render — including the collider-rebuild cycle triggered below by
+  // refresh → onSyncGroup — which would call refresh again and loop forever.
+  const resolveTextures = useCallback(
+    (obj: BlenderObject): ResolvedTextures => ({
       map: obj.texture
         ? getOrCreateTexture(obj.texture, texData, "color")
         : null,
@@ -141,7 +136,11 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
         ? getOrCreateTexture(obj.emissiveMap, texData, "color")
         : null,
     }),
-    computeCacheKey: (obj: BlenderObject, textures) => {
+    [texData],
+  );
+
+  const computeCacheKey = useCallback(
+    (obj: BlenderObject, textures: ResolvedTextures) => {
       const geoBuf = geoBuffers.get(obj.name);
       return computeMeshCacheKey(
         obj.name,
@@ -154,7 +153,11 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
         textures.emissiveMap,
       );
     },
-    buildGeometryMaterial: (obj: BlenderObject, textures) => {
+    [geoBuffers],
+  );
+
+  const buildGeometryMaterial = useCallback(
+    (obj: BlenderObject, textures: ResolvedTextures) => {
       const geoBuf = geoBuffers.get(obj.name);
       if (!geoBuf || geoBuf.version !== obj.version) return null;
 
@@ -195,6 +198,29 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
 
       return geoMat as any;
     },
+    [geoBuffers],
+  );
+
+  // Fired by useMeshSync after every sync run — hand the container back so the
+  // caller can rebuild its collider. The container itself is stable; the call
+  // is the "data changed" signal.
+  const handleRefresh = useCallback(
+    (_v: any) => {
+      if (onSyncGroup) onSyncGroup(group.o3d);
+    },
+    [onSyncGroup, group],
+  );
+
+  useMeshSync({
+    scene: group.o3d!,
+    objects: sceneData.objects,
+    // Colliders need plain meshes — InstancedMesh per-instance transforms
+    // are not reflected in matrixWorld, which physics reads for collision.
+    singleInstance: !!onSyncGroup,
+    refresh: handleRefresh,
+    resolveTextures,
+    computeCacheKey,
+    buildGeometryMaterial,
   });
 
   // Blender energy (Watts) → Three.js intensity conversion.

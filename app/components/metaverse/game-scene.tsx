@@ -266,11 +266,14 @@ export function MyScene({
 
   // Blender-synced mesh container (handed back by SyncViewer) — wrapped in a
   // KinematicPlatform below so the Blender scene acts as a player collider.
-  const [syncScene, setSyncScene] = useState<{ o3d: THREE.Object3D | null }>({
-    o3d: null,
-  });
+  const [syncScene, setSyncScene] = useState<{
+    o3d: THREE.Object3D | null;
+    revision: number;
+  }>({ o3d: null, revision: 0 });
+  // Called by SyncViewer after every Blender sync — bump the revision so the
+  // KinematicPlatform rebuilds its collider from the freshly-synced meshes.
   const handleSyncGroup = useCallback((o3d: THREE.Object3D) => {
-    setSyncScene((prev) => (prev.o3d === o3d ? prev : { o3d }));
+    setSyncScene((prev) => ({ o3d, revision: prev.revision + 1 }));
   }, []);
 
   // function WhenReady({ children, registerPlatform }: any) {
@@ -326,7 +329,10 @@ export function MyScene({
 
       {/* Blender-synced meshes as a collider — the player can walk on the scene */}
       {syncScene.o3d && (
-        <KinematicPlatform onReady={registerPlatform}>
+        <KinematicPlatform
+          onReady={registerPlatform}
+          rebuildSignal={syncScene.revision}
+        >
           <group name="ready"></group>
           <primitive object={syncScene.o3d} />
         </KinematicPlatform>
