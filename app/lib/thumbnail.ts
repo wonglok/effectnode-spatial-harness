@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
+import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
 const SKY_HDR_URL = "/assets/place/sky.hdr";
 
@@ -54,7 +54,7 @@ export async function generateModelThumbnail(
   try {
     pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
-    const rgbe = new RGBELoader();
+    const rgbe = new HDRLoader();
     hdr = await rgbe.loadAsync(SKY_HDR_URL);
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     const envRT = pmrem.fromEquirectangular(hdr);

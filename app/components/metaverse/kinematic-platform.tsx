@@ -1,9 +1,26 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshBVH, ObjectBVH } from "three-mesh-bvh";
 import type { MovingPlatform } from "./physics";
+
+/** Cheap numeric fingerprint of a group's mesh topology — which meshes exist
+ *  and which geometries they use. Changes when a sync source (e.g. Blender)
+ *  adds, removes, or replaces meshes, which refit() can't handle. */
+function topologySignature(root: THREE.Object3D): number {
+  let sig = 0;
+  root.traverse((c) => {
+    const mesh = c as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const u = mesh.geometry.uuid;
+    for (let i = 0; i < u.length; i++) sig = (sig * 33) ^ u.charCodeAt(i);
+    const n = mesh.name;
+    for (let i = 0; i < n.length; i++) sig = (sig * 33) ^ n.charCodeAt(i);
+    sig = (sig * 33) | 0;
+  });
+  return sig;
+}
 
 interface KinematicPlatformProps {
   /** GLB model URL. If omitted, children are used as the platform geometry. */
@@ -44,74 +61,17 @@ export function KinematicPlatform({
   const bvhRef = useRef<ObjectBVH | null>(null);
   const velocity = useRef(new THREE.Vector3());
   const unregisterRef = useRef<(() => void) | null>(null);
+  const lastTopologyRef = useRef(0);
 
-  // Build BVH from children once they're in the group (or after GLB load)
-  useEffect(() => {
-    let clean = () => {};
+  const buildBVH = useCallback(() => {
+    const group = groupRef.current;
+    if (!group) return;
 
-    let tt = setInterval(() => {
-      if (groupRef.current) {
-        clearInterval(tt);
-        const group = groupRef.current;
-        if (!group) return;
-        // if (url) return; // wait for GLB loader if URL is set
-        if (!children) return;
+    // Tear down the previous collider before rebuilding
+    unregisterRef.current?.();
+    unregisterRef.current = null;
+    bvhRef.current = null;
 
-        // Allow one frame for R3F to populate the group with child meshes
-        const id = setTimeout(() => {
-          if (!groupRef.current) return;
-          buildBVH(groupRef.current);
-        }, 5);
-
-        clean();
-        clean = () => {
-          unregisterRef.current?.();
-          clearTimeout(id);
-        };
-      }
-    }, 10);
-
-    return () => {
-      clearInterval(tt);
-      clean();
-    };
-  }, [children, url]);
-
-  // // Load GLB and build BVH
-  // useEffect(() => {
-  //   if (!url) return;
-  //   let cancelled = false;
-
-  //   new GLTFLoader().load(url, (res) => {
-  //     if (cancelled) return;
-
-  //     const gltfScene = res.scene;
-  //     gltfScene.scale.setScalar(scale);
-
-  //     gltfScene.traverse((c) => {
-  //       c.castShadow = true;
-  //       c.receiveShadow = true;
-  //       const mesh = c as THREE.Mesh;
-  //       if (mesh.isMesh && !mesh.geometry.boundsTree) {
-  //         mesh.geometry.boundsTree = new MeshBVH(mesh.geometry);
-  //       }
-  //     });
-
-  //     gltfScene.updateMatrixWorld(true);
-
-  //     const group = groupRef.current;
-  //     if (!group) return;
-  //     group.add(gltfScene);
-
-  //     buildBVH(group);
-  //   });
-
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [url, scale]);
-
-  function buildBVH(group: THREE.Group) {
     group.traverse((c) => {
       const mesh = c as THREE.Mesh;
       if (mesh.isMesh && !mesh.geometry.boundsTree) {
@@ -130,7 +90,41 @@ export function KinematicPlatform({
       velocity: velocity.current,
     };
     unregisterRef.current = onReady?.(platform) ?? null;
-  }
+  }, [onReady]);
+
+  // Build BVH from children once they're in the group (or after GLB load)
+  useEffect(() => {
+    let clean = () => {};
+
+    let tt = setInterval(() => {
+      if (groupRef.current?.getObjectByName("ready")) {
+        clearInterval(tt);
+        // if (url) return; // wait for GLB loader if URL is set
+        if (!children) return;
+
+        // Allow one frame for R3F to populate the group with child meshes
+        const id = setTimeout(() => {
+          buildBVH();
+        }, 5);
+
+        clean();
+        clean = () => clearTimeout(id);
+      }
+    }, 10);
+
+    return () => {
+      clearInterval(tt);
+      clean();
+    };
+  }, [children, url, buildBVH]);
+
+  // Unregister from the physics loop on unmount
+  useEffect(() => {
+    return () => {
+      unregisterRef.current?.();
+      unregisterRef.current = null;
+    };
+  }, []);
 
   // Animate using wall-clock time so all peers stay in sync without network
   useFrame(() => {
@@ -162,9 +156,17 @@ export function KinematicPlatform({
     if (axis !== "y") group.position.y = position[1];
     if (axis !== "z") group.position.z = position[2];
 
-    // Refit BVH so shapecast sees the updated position
-    group.updateMatrixWorld();
-    bvhRef.current?.refit();
+    // Rebuild the collider when mesh topology changes (Blender sync adds,
+    // removes, or replaces meshes); otherwise refit so shapecast sees the
+    // updated transforms.
+    const sig = topologySignature(group);
+    if (sig !== lastTopologyRef.current) {
+      lastTopologyRef.current = sig;
+      buildBVH();
+    } else {
+      group.updateMatrixWorld();
+      bvhRef.current?.refit();
+    }
   });
 
   return <group ref={groupRef}>{children}</group>;
