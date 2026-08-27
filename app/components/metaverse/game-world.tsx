@@ -43,21 +43,21 @@ export function GameWorld({
       {/*  */}
 
       <WebGPUCanvas camera={{ fov: 60, near: 0.5, far: 500 }}>
-        {/* <EffectsSSGI
+        <EffectsSSGI
           hdriUrl={hdriUrl ?? undefined}
           environmentIntensity={environmentIntensity}
-        > */}
-        <Suspense fallback={null}>
-          <MyScene
-            keysRef={keysRef}
-            spacePressedRef={spacePressedRef}
-            joystickInputRef={joystickInputRef}
-            avatarUrl={avatarUrl}
-            placeURL={placeURL}
-            props={props}
-          />
-        </Suspense>
-        {/* </EffectsSSGI> */}
+        >
+          <Suspense fallback={null}>
+            <MyScene
+              keysRef={keysRef}
+              spacePressedRef={spacePressedRef}
+              joystickInputRef={joystickInputRef}
+              avatarUrl={avatarUrl}
+              placeURL={placeURL}
+              props={props}
+            />
+          </Suspense>
+        </EffectsSSGI>
       </WebGPUCanvas>
 
       <JoystickControls

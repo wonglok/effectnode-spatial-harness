@@ -1,14 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import {
-  FileText,
-  LayoutGrid,
-  List,
-  Trash2,
-  Upload,
-  Wand2,
-} from "lucide-react";
+import { FileText, LayoutGrid, List, Trash2, Upload, Wand2 } from "lucide-react";
 import { useAssetManagerStore, type AssetFile } from "@/stores/asset-manager";
 import { cn } from "@/lib/utils";
 
@@ -22,36 +15,6 @@ function thumbFor(f: AssetFile): string | null {
   if (f.thumbnailUrl) return f.thumbnailUrl;
   if (f.contentType.startsWith("image/")) return f.url;
   return null;
-}
-
-function FileThumb({
-  f,
-  wrapperClass,
-  iconClass,
-}: {
-  f: AssetFile;
-  wrapperClass: string;
-  iconClass: string;
-}) {
-  const [failed, setFailed] = useState(false);
-  const src = !failed ? thumbFor(f) : null;
-
-  return (
-    <div className={cn("relative overflow-hidden", wrapperClass)}>
-      {src ? (
-        <img
-          src={src}
-          alt={f.name}
-          onError={() => setFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <FileText className={iconClass} />
-        </div>
-      )}
-    </div>
-  );
 }
 
 /** S3-backed file manager for a single world's assets. */
@@ -173,9 +136,7 @@ export function FileManager({ worldId }: { worldId: string }) {
               <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-white/50">
                 <span className="min-w-0 flex-1 truncate">{u.name}</span>
                 <span className={u.status === "error" ? "text-red-400" : ""}>
-                  {u.status === "error"
-                    ? "failed"
-                    : `${Math.round(u.progress)}%`}
+                  {u.status === "error" ? "failed" : `${Math.round(u.progress)}%`}
                 </span>
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-white/10">
@@ -208,11 +169,17 @@ export function FileManager({ worldId }: { worldId: string }) {
                 key={f.id}
                 className="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-white/5"
               >
-                <FileThumb
-                  f={f}
-                  wrapperClass="size-8 shrink-0 rounded-md border border-white/10 bg-white/5"
-                  iconClass="size-4 text-white/40"
-                />
+                {thumbFor(f) ? (
+                  <img
+                    src={thumbFor(f)!}
+                    alt=""
+                    className="size-8 shrink-0 rounded-md border border-white/10 object-cover"
+                  />
+                ) : (
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5">
+                    <FileText className="size-4 text-white/40" />
+                  </div>
+                )}
                 <a
                   href={f.url}
                   target="_blank"
@@ -251,11 +218,17 @@ export function FileManager({ worldId }: { worldId: string }) {
                 >
                   <Trash2 className="size-3" />
                 </button>
-                <FileThumb
-                  f={f}
-                  wrapperClass="aspect-square w-full rounded-lg border border-white/10 bg-white/5"
-                  iconClass="size-8 text-white/40"
-                />
+                {thumbFor(f) ? (
+                  <img
+                    src={thumbFor(f)!}
+                    alt={f.name}
+                    className="aspect-square w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                    <FileText className="size-8 text-white/40" />
+                  </div>
+                )}
                 <span
                   className="w-full truncate text-center text-[11px] text-white/70"
                   title={f.name}

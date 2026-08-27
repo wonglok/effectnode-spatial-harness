@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useRef,
-  useEffect,
-  Suspense,
-  useMemo,
-  useCallback,
-  useState,
-} from "react";
+import { useRef, useEffect, Suspense, useMemo, useCallback } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import { DoubleSide, Euler, Vector3 } from "three/webgpu";
 import * as THREE from "three/webgpu";
@@ -35,12 +28,6 @@ import {
   PLAYER_CAPSULE,
 } from "./scene-defaults";
 import type { WorldProp } from "../../../shared/types/world";
-import {
-  BlenderConnection,
-  SyncViewer,
-  type MeshSyncChange,
-} from "@/b3-runtime/src";
-import { Box } from "@react-three/drei";
 
 export interface MySceneProps {
   keysRef: React.RefObject<{
@@ -268,37 +255,6 @@ export function MyScene({
     };
   }, []);
 
-  // Blender-synced mesh container (handed back by SyncViewer) — wrapped in a
-  // KinematicPlatform below so the Blender scene acts as a player collider.
-  const [syncScene, setSyncScene] = useState<{
-    o3d: THREE.Object3D | null;
-    revision: number;
-  }>({ o3d: null, revision: 0 });
-  // Called by SyncViewer after every Blender sync. Always attach the container
-  // (the first sync may carry no geometry yet, so `needsColliderRebuild` alone
-  // can't be relied on to kick off mounting). Once attached, only bump the
-  // revision — and thus rebuild the collider — on topology/geometry/material
-  // changes; transform-only updates are handled by the per-frame BVH refit.
-  const handleSyncGroup = useCallback(
-    (o3d: THREE.Object3D, change: MeshSyncChange) => {
-      setSyncScene((prev) => {
-        if (prev.o3d !== o3d) {
-          return { o3d, revision: prev.revision + 1 };
-        }
-        return change.needsColliderRebuild
-          ? { o3d, revision: prev.revision + 1 }
-          : prev;
-      });
-    },
-    [],
-  );
-
-  // function WhenReady({ children, registerPlatform }: any) {
-  //   return (
-
-  //   );
-  // }
-
   return (
     <>
       <directionalLight
@@ -323,7 +279,6 @@ export function MyScene({
           fallback={
             <KinematicPlatform onReady={registerPlatform}>
               <mesh receiveShadow position={[0, -0.25, 0]}>
-                <group name="ready"></group>
                 <cylinderGeometry args={[100, 100, 0.5]} />
                 <meshStandardNodeMaterial
                   color="#ffffff"
@@ -335,24 +290,9 @@ export function MyScene({
           }
         >
           <KinematicPlatform onReady={registerPlatform}>
-            <group name="ready"></group>
             <GLBModel src={placeURL} receiveShadow castShadow />
           </KinematicPlatform>
         </Suspense>
-      )}
-
-      <BlenderConnection></BlenderConnection>
-      <SyncViewer onSyncGroup={handleSyncGroup}></SyncViewer>
-
-      {/* Blender-synced meshes as a collider — the player can walk on the scene */}
-      {syncScene.o3d && (
-        <KinematicPlatform
-          onReady={registerPlatform}
-          rebuildSignal={syncScene.revision}
-        >
-          <group name="ready"></group>
-          <primitive object={syncScene.o3d} />
-        </KinematicPlatform>
       )}
 
       {/* Editor-placed props */}
