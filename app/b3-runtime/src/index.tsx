@@ -20,6 +20,7 @@ import { useBlenderSyncStore } from "./components/stores/blenderSyncStore";
 import { useSettingsStore } from "./components/stores/settingsStore";
 
 export * from "./components/types/blenderTypes";
+export type { MeshSyncChange } from "./components/blender/canvas-units/useMeshSync";
 
 // stores
 export { useSettingsStore, useBlenderSyncStore, useBlenderStore };

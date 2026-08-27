@@ -14,6 +14,7 @@ import { LightFromData } from "../canvas-units/LightFromData";
 import {
   useMeshSync,
   type ResolvedTextures,
+  type MeshSyncChange,
 } from "../canvas-units/useMeshSync";
 import { useEnvironmentMap } from "../canvas-units/useEnvironmentMap";
 
@@ -75,7 +76,7 @@ export interface SyncViewerProps {
    *  and fills in as Blender data streams over the WebSocket. Meshes are built
    *  without InstancedMesh batching so each object carries its own matrixWorld
    *  — required for BVH collision. */
-  onSyncGroup?: (group: Object3D) => void;
+  onSyncGroup?: (group: Object3D, change: MeshSyncChange) => void;
 }
 
 export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
@@ -201,12 +202,12 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
     [geoBuffers],
   );
 
-  // Fired by useMeshSync after every sync run — hand the container back so the
-  // caller can rebuild its collider. The container itself is stable; the call
-  // is the "data changed" signal.
+  // Fired by useMeshSync after every sync run — hand the container back along
+  // with a summary of what changed so the caller can decide whether to rebuild
+  // its collider (add/remove/geometry swap) or just refit (transform).
   const handleRefresh = useCallback(
-    (_v: any) => {
-      if (onSyncGroup) onSyncGroup(group.o3d);
+    (change: MeshSyncChange) => {
+      if (onSyncGroup) onSyncGroup(group.o3d, change);
     },
     [onSyncGroup, group],
   );

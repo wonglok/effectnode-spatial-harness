@@ -11,6 +11,10 @@ import type { BlenderObject } from "../../types/blenderTypes";
 interface CachedMesh {
   mesh: THREE.Mesh;
   version: string;
+  /** Current geometry/material on the mesh — compared on each sync so changes
+   *  can be applied in place instead of recreating the mesh node. */
+  geometry: THREE.BufferGeometry;
+  material: THREE.Material;
 }
 
 interface InstanceSlot {
@@ -49,6 +53,25 @@ export interface BuiltGeometryMaterial {
   material: THREE.Material;
 }
 
+/** What changed during a single sync run. Lets consumers distinguish a cheap
+ *  transform-only update (refit the collider) from a topology / geometry change
+ *  (rebuild the collider). */
+export interface MeshSyncChange {
+  /** Object names whose mesh node was created this run. */
+  added: string[];
+  /** Object names whose mesh node was removed this run. */
+  removed: string[];
+  /** Object names whose geometry was swapped in place. */
+  geometryChanged: string[];
+  /** Object names whose material was swapped in place. */
+  materialChanged: string[];
+  /** Object names whose transform (position/quaternion/scale) changed. */
+  transformChanged: string[];
+  /** True when a collider's BVH must be rebuilt (add/remove/geometry/material
+   *  change). False for transform-only updates, which a per-frame refit covers. */
+  needsColliderRebuild: boolean;
+}
+
 export interface MeshSyncOptions {
   scene: THREE.Scene | THREE.Object3D | THREE.Group;
   objects: BlenderObject[];
@@ -72,7 +95,8 @@ export interface MeshSyncOptions {
    *  per-instance matrices of an InstancedMesh, so instanced colliders resolve
    *  at the wrong positions. */
   singleInstance?: boolean;
-  refresh?: (v: any) => void;
+  /** Called once per sync run with a summary of what changed. */
+  refresh?: (change: MeshSyncChange) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +135,32 @@ export function useMeshSync({
     const instanced = instancedRef.current;
     const slots = slotsRef.current;
     const incomingNames = new Set<string>();
+
+    // Track what changed this run so consumers can decide whether to rebuild
+    // a collider (add/remove/geometry swap) versus just refit (transform).
+    const change: MeshSyncChange = {
+      added: [],
+      removed: [],
+      geometryChanged: [],
+      materialChanged: [],
+      transformChanged: [],
+      needsColliderRebuild: false,
+    };
+
+    // Resolve geometry+material from the cache, building once per cacheKey.
+    const geoMatMap = geoMatCache.current;
+    const resolveGeoMat = (
+      cacheKey: string,
+      obj: BlenderObject,
+      textures: ResolvedTextures,
+    ): BuiltGeometryMaterial | null => {
+      const existing = geoMatMap.get(cacheKey);
+      if (existing) return existing;
+      const built = buildGeometryMaterial(obj, textures);
+      if (!built) return null;
+      geoMatMap.set(cacheKey, built);
+      return built;
+    };
 
     // ---- Phase 0: resolve textures & compute cache keys ----
 
@@ -159,18 +209,16 @@ export function useMeshSync({
         if (needsRebuild) {
           // Remove old instanced mesh
           if (entry) {
-            for (const n of entry.names) slots.delete(n);
+            for (const n of entry.names) {
+              slots.delete(n);
+              change.removed.push(n);
+            }
             scene.remove(entry.mesh);
           }
 
           // Build geometry + material (once for the group)
-          let geoMat = geoMatCache.current.get(cacheKey);
-          if (!geoMat) {
-            const built = buildGeometryMaterial(first.obj, first.textures);
-            if (!built) continue;
-            geoMat = built;
-            geoMatCache.current.set(cacheKey, geoMat);
-          }
+          const geoMat = resolveGeoMat(cacheKey, first.obj, first.textures);
+          if (!geoMat) continue;
 
           const im = new THREE.InstancedMesh(
             geoMat.geometry,
@@ -183,6 +231,7 @@ export function useMeshSync({
 
           entry = { mesh: im, names: currentNames };
           instanced.set(cacheKey, entry);
+          for (const n of currentNames) change.added.push(n);
         }
 
         // Track slots & set instance matrices directly
@@ -220,6 +269,7 @@ export function useMeshSync({
             if (old) {
               scene.remove(old.mesh);
               meshes.delete(item.obj.name);
+              change.removed.push(item.obj.name);
             }
           }
         }
@@ -237,21 +287,12 @@ export function useMeshSync({
 
         let cached = meshes.get(obj.name);
 
-        if (!cached || cached.version !== cacheKey) {
-          if (cached) {
-            scene.remove(cached.mesh);
-            cached = undefined;
-          }
-
-          let geoMat = geoMatCache.current.get(cacheKey);
+        if (!cached) {
+          // First time seeing this object — create its mesh node.
+          const geoMat = resolveGeoMat(cacheKey, obj, textures);
           if (!geoMat) {
-            const built = buildGeometryMaterial(obj, textures);
-            if (!built) {
-              // Geometry data not ready yet — skip this object
-              continue;
-            }
-            geoMat = built;
-            geoMatCache.current.set(cacheKey, geoMat);
+            // Geometry data not ready yet — skip this object
+            continue;
           }
 
           const mesh = new THREE.Mesh(geoMat.geometry, geoMat.material);
@@ -260,24 +301,61 @@ export function useMeshSync({
           mesh.receiveShadow = true;
           scene.add(mesh);
 
-          cached = { mesh, version: cacheKey };
+          cached = {
+            mesh,
+            version: cacheKey,
+            geometry: geoMat.geometry,
+            material: geoMat.material,
+          };
           meshes.set(obj.name, cached);
+          change.added.push(obj.name);
+        } else if (cached.version !== cacheKey) {
+          // Geometry / material changed — swap them in place so the mesh node
+          // (and any downstream collider reference to it) survives. This avoids
+          // the remove + recreate churn that would otherwise re-parent the mesh
+          // and force a full BVH rebuild every time Blender edits geometry.
+          const geoMat = resolveGeoMat(cacheKey, obj, textures);
+          if (geoMat) {
+            if (cached.geometry !== geoMat.geometry) {
+              cached.mesh.geometry = geoMat.geometry;
+              cached.geometry = geoMat.geometry;
+              change.geometryChanged.push(obj.name);
+            }
+            if (cached.material !== geoMat.material) {
+              cached.mesh.material = geoMat.material;
+              cached.material = geoMat.material;
+              change.materialChanged.push(obj.name);
+            }
+            cached.version = cacheKey;
+          }
         }
 
-        // Set transform directly (avoids creating new objects each frame)
+        // Set transform in place, only touching the node when values actually
+        // differ (avoids dirtying matrices / triggering re-renders needlessly).
         if (cached) {
-          cached.mesh.position.set(
-            obj.position[0],
-            obj.position[1],
-            obj.position[2],
-          );
-          cached.mesh.quaternion.set(
-            obj.quaternion[0],
-            obj.quaternion[1],
-            obj.quaternion[2],
-            obj.quaternion[3],
-          );
-          cached.mesh.scale.set(obj.scale[0], obj.scale[1], obj.scale[2]);
+          const m = cached.mesh;
+          const [px, py, pz] = obj.position;
+          const [qx, qy, qz, qw] = obj.quaternion;
+          const [sx, sy, sz] = obj.scale;
+
+          const moved =
+            m.position.x !== px ||
+            m.position.y !== py ||
+            m.position.z !== pz ||
+            m.quaternion.x !== qx ||
+            m.quaternion.y !== qy ||
+            m.quaternion.z !== qz ||
+            m.quaternion.w !== qw ||
+            m.scale.x !== sx ||
+            m.scale.y !== sy ||
+            m.scale.z !== sz;
+
+          if (moved) {
+            m.position.set(px, py, pz);
+            m.quaternion.set(qx, qy, qz, qw);
+            m.scale.set(sx, sy, sz);
+            change.transformChanged.push(obj.name);
+          }
         }
       }
     }
@@ -289,13 +367,17 @@ export function useMeshSync({
       if (!incomingNames.has(name)) {
         scene.remove(entry.mesh);
         meshes.delete(name);
+        change.removed.push(name);
       }
     }
 
     // Remove stale instanced groups
     for (const [cacheKey, entry] of instanced) {
       if (!groups.has(cacheKey)) {
-        for (const n of entry.names) slots.delete(n);
+        for (const n of entry.names) {
+          slots.delete(n);
+          change.removed.push(n);
+        }
         scene.remove(entry.mesh);
         instanced.delete(cacheKey);
       }
@@ -307,6 +389,13 @@ export function useMeshSync({
         slots.delete(name);
       }
     }
-    refresh(Math.random());
+
+    change.needsColliderRebuild =
+      change.added.length > 0 ||
+      change.removed.length > 0 ||
+      change.geometryChanged.length > 0 ||
+      change.materialChanged.length > 0;
+
+    refresh(change);
   }, [scene, objects, resolveTextures, computeCacheKey, buildGeometryMaterial]);
 }

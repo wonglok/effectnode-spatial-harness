@@ -35,7 +35,11 @@ import {
   PLAYER_CAPSULE,
 } from "./scene-defaults";
 import type { WorldProp } from "../../../shared/types/world";
-import { BlenderConnection, SyncViewer } from "@/b3-runtime/src";
+import {
+  BlenderConnection,
+  SyncViewer,
+  type MeshSyncChange,
+} from "@/b3-runtime/src";
 import { Box } from "@react-three/drei";
 
 export interface MySceneProps {
@@ -270,11 +274,24 @@ export function MyScene({
     o3d: THREE.Object3D | null;
     revision: number;
   }>({ o3d: null, revision: 0 });
-  // Called by SyncViewer after every Blender sync — bump the revision so the
-  // KinematicPlatform rebuilds its collider from the freshly-synced meshes.
-  const handleSyncGroup = useCallback((o3d: THREE.Object3D) => {
-    setSyncScene((prev) => ({ o3d, revision: prev.revision + 1 }));
-  }, []);
+  // Called by SyncViewer after every Blender sync. Always attach the container
+  // (the first sync may carry no geometry yet, so `needsColliderRebuild` alone
+  // can't be relied on to kick off mounting). Once attached, only bump the
+  // revision — and thus rebuild the collider — on topology/geometry/material
+  // changes; transform-only updates are handled by the per-frame BVH refit.
+  const handleSyncGroup = useCallback(
+    (o3d: THREE.Object3D, change: MeshSyncChange) => {
+      setSyncScene((prev) => {
+        if (prev.o3d !== o3d) {
+          return { o3d, revision: prev.revision + 1 };
+        }
+        return change.needsColliderRebuild
+          ? { o3d, revision: prev.revision + 1 }
+          : prev;
+      });
+    },
+    [],
+  );
 
   // function WhenReady({ children, registerPlatform }: any) {
   //   return (

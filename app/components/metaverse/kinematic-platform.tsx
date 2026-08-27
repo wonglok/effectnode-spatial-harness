@@ -53,6 +53,10 @@ export function KinematicPlatform({
   // Set once the initial collider is built — rebuildSignal only triggers
   // rebuilds, never the very first build (the "ready" poll owns that).
   const hasBuiltRef = useRef(false);
+  // Number of collidable meshes the current BVH was built from. Compared each
+  // frame so a mesh appearing/disappearing (Blender geometry still streaming in)
+  // triggers a rebuild even if the rebuildSignal plumbing misses it.
+  const lastMeshCountRef = useRef(0);
 
   const buildBVH = useCallback(() => {
     const group = groupRef.current;
@@ -63,18 +67,26 @@ export function KinematicPlatform({
     unregisterRef.current = null;
     bvhRef.current = null;
 
+    let meshCount = 0;
     group.traverse((c) => {
       const mesh = c as THREE.Mesh;
-      if (mesh.isMesh && !mesh.geometry.boundsTree) {
+      if (!mesh.isMesh) return;
+      meshCount++;
+      if (!mesh.geometry.boundsTree) {
         mesh.geometry.boundsTree = new MeshBVH(mesh.geometry);
       }
     });
+
+    // No collidable meshes yet — mark as built and remember the empty state so
+    // a later mesh arrival (detected in useFrame or via rebuildSignal) rebuilds.
+    hasBuiltRef.current = true;
+    lastMeshCountRef.current = meshCount;
+    if (meshCount === 0) return;
 
     group.updateMatrixWorld(true);
 
     const bvh = new ObjectBVH(group, { maxLeafTris: 1 });
     bvhRef.current = bvh;
-    hasBuiltRef.current = true;
 
     const platform: MovingPlatform = {
       group,
@@ -156,11 +168,22 @@ export function KinematicPlatform({
     if (axis !== "y") group.position.y = position[1];
     if (axis !== "z") group.position.z = position[2];
 
-    // Refit BVH so shapecast sees the updated position. Topology changes
-    // (meshes added / moved / replaced by Blender sync) are handled by the
-    // rebuildSignal effect instead — refit() only handles transforms.
-    group.updateMatrixWorld();
-    bvhRef.current?.refit();
+    // Detect topology changes (meshes added / removed) by their count and
+    // rebuild. refit() only handles transforms, so it can't pick up a new mesh
+    // that arrived after the initial (possibly empty) build. This is a cheap
+    // fallback alongside the explicit rebuildSignal path.
+    let meshCount = 0;
+    group.traverse((c) => {
+      if ((c as THREE.Mesh).isMesh) meshCount++;
+    });
+
+    if (meshCount !== lastMeshCountRef.current) {
+      buildBVH();
+    } else {
+      // Refit BVH so shapecast sees the updated position.
+      group.updateMatrixWorld();
+      bvhRef.current?.refit();
+    }
   });
 
   return <group ref={groupRef}>{children}</group>;
