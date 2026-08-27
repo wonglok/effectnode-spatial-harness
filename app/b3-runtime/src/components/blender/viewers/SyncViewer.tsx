@@ -233,6 +233,7 @@ export function SyncViewer({ onSyncGroup }: SyncViewerProps = {}) {
       {/* When handing the sync container to a caller (collider mode), the
           caller attaches it — otherwise attach it here for plain display. */}
       {!onSyncGroup && group.display}
+
       {/* Lights from Blender — declarative via shared LightFromData */}
       {lights.map((light) => (
         <LightFromData
